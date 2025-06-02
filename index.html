@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Habitide - Fitness & Financial Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Desktop Navigation -->
+        <nav class="nav-desktop">
+            <div class="nav-brand">
+                <h2>Habitide</h2>
+            </div>
+            <div class="nav-links">
+                <button class="nav-link active" data-section="dashboard">
+                    <span>📊</span> Dashboard
+                </button>
+                <button class="nav-link" data-section="workout">
+                    <span>💪</span> Workout
+                </button>
+                <button class="nav-link" data-section="calendar">
+                    <span>📅</span> Calendar
+                </button>
+                <button class="nav-link" data-section="profile">
+                    <span>👤</span> Profile
+                </button>
+            </div>
+            <button class="theme-toggle" id="themeToggle">
+                <span class="theme-icon">🌙</span>
+            </button>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard Section -->
+            <section id="dashboard" class="section active">
+                <div class="container">
+                    <div class="section-header">
+                        <h1>Dashboard</h1>
+                        <p>Track your fitness progress and financial goals</p>
+                    </div>
+
+                    <div class="dashboard-grid">
+                        <!-- Progress Overview -->
+                        <div class="card progress-card">
+                            <div class="card__body">
+                                <h3>Progress Overview</h3>
+                                <div class="progress-stats">
+                                    <div class="stat-item">
+                                        <span class="stat-label">Target Goal</span>
+                                        <span class="stat-value" id="targetGoal">₹20,000</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Current Balance</span>
+                                        <span class="stat-value" id="currentBalance">₹20,000</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Total Saved</span>
+                                        <span class="stat-value" id="totalSaved">₹0</span>
+                                    </div>
+                                </div>
+                                <div class="progress-circle">
+                                    <svg class="progress-ring" width="200" height="200">
+                                        <circle class="progress-ring-circle" stroke="var(--color-border)" stroke-width="8" fill="transparent" r="88" cx="100" cy="100"/>
+                                        <circle class="progress-ring-progress" stroke="url(#gradient)" stroke-width="8" fill="transparent" r="88" cx="100" cy="100" id="progressCircle"/>
+                                        <defs>
+                                            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                <stop offset="0%" style="stop-color:#8B5CF6;stop-opacity:1" />
+                                                <stop offset="100%" style="stop-color:#3B82F6;stop-opacity:1" />
+                                            </linearGradient>
+                                        </defs>
+                                    </svg>
+                                    <div class="progress-text-center">
+                                        <div class="progress-percentage" id="progressPercentage">0%</div>
+                                        <div class="progress-label">towards goal</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Health Stats -->
+                        <div class="card stats-card">
+                            <div class="card__body">
+                                <h3>Health Stats</h3>
+                                <div class="health-stats">
+                                    <div class="health-stat">
+                                        <div class="stat-icon">💰</div>
+                                        <div class="stat-info">
+                                            <div class="stat-number" id="totalEarned">₹0</div>
+                                            <div class="stat-text">Total Earned</div>
+                                        </div>
+                                    </div>
+                                    <div class="health-stat">
+                                        <div class="stat-icon">📉</div>
+                                        <div class="stat-info">
+                                            <div class="stat-number" id="totalLost">₹0</div>
+                                            <div class="stat-text">Total Lost</div>
+                                        </div>
+                                    </div>
+                                    <div class="health-stat">
+                                        <div class="stat-icon">🔥</div>
+                                        <div class="stat-info">
+                                            <div class="stat-number" id="currentStreak">0</div>
+                                            <div class="stat-text">Current Streak</div>
+                                        </div>
+                                    </div>
+                                    <div class="health-stat">
+                                        <div class="stat-icon">📅</div>
+                                        <div class="stat-info">
+                                            <div class="stat-number" id="todayActions">0</div>
+                                            <div class="stat-text">Today's Actions</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quick Actions Today -->
+                        <div class="card quick-actions-card">
+                            <div class="card__body">
+                                <h3>Quick Actions - Today</h3>
+                                <p class="quick-actions-subtitle">One action per type per day</p>
+                                <div class="quick-actions" id="quickActionsContainer">
+                                    <!-- Will be populated by JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Add Actions -->
+                        <div class="card add-actions-card">
+                            <div class="card__body">
+                                <h3>Add Actions</h3>
+                                <p class="add-actions-subtitle">Add actions for any date</p>
+                                <div class="add-actions-form">
+                                    <div class="form-group">
+                                        <label class="form-label">Select Date</label>
+                                        <input type="date" class="form-control" id="actionDate">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Action Type</label>
+                                        <select class="form-control" id="addActionType">
+                                            <option value="">Choose an action...</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Notes (Optional)</label>
+                                        <input type="text" class="form-control" id="actionNotes" placeholder="Add a note...">
+                                    </div>
+                                    <button class="btn btn--primary btn--full-width" id="addActionBtn">Add Action</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recent Activities -->
+                        <div class="card activities-card">
+                            <div class="card__body">
+                                <h3>Recent Activities</h3>
+                                <div class="activities-list" id="recentActivities">
+                                    <p class="empty-state">No activities yet. Add your first action!</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Achievement Badges -->
+                        <div class="card achievements-card">
+                            <div class="card__body">
+                                <h3>Achievement Badges</h3>
+                                <div class="badges-grid" id="badgesGrid">
+                                    <!-- Badges will be populated by JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Workout Section -->
+            <section id="workout" class="section">
+                <div class="container">
+                    <div class="section-header">
+                        <h1>Workout Tracker</h1>
+                        <p>5-day Monday-Friday routine + custom workouts for all days</p>
+                    </div>
+
+                    <div class="workout-tabs">
+                        <button class="workout-tab active" data-day="Monday">Monday</button>
+                        <button class="workout-tab" data-day="Tuesday">Tuesday</button>
+                        <button class="workout-tab" data-day="Wednesday">Wednesday</button>
+                        <button class="workout-tab" data-day="Thursday">Thursday</button>
+                        <button class="workout-tab" data-day="Friday">Friday</button>
+                        <button class="workout-tab" data-day="Saturday">Saturday</button>
+                        <button class="workout-tab" data-day="Sunday">Sunday</button>
+                    </div>
+
+                    <div class="workout-content" id="workoutContent">
+                        <!-- Workout content will be populated by JavaScript -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Calendar Section -->
+            <section id="calendar" class="section">
+                <div class="container">
+                    <div class="section-header">
+                        <h1>Calendar View</h1>
+                        <p>View and manage your daily actions</p>
+                    </div>
+
+                    <div class="calendar-container">
+                        <div class="calendar-main">
+                            <div class="calendar-header">
+                                <button class="btn btn--outline" id="prevMonth">‹</button>
+                                <h3 id="currentMonth">June 2025</h3>
+                                <button class="btn btn--outline" id="nextMonth">›</button>
+                            </div>
+                            <div class="calendar-grid" id="calendarGrid">
+                                <!-- Calendar will be populated by JavaScript -->
+                            </div>
+                        </div>
+                        <div class="calendar-sidebar">
+                            <div class="card">
+                                <div class="card__body">
+                                    <h3 id="selectedDateDisplay">Select a date</h3>
+                                    <div class="selected-date-actions" id="selectedDateActions">
+                                        <p class="empty-state">No actions for this date</p>
+                                    </div>
+                                    <div class="calendar-action-form">
+                                        <select class="form-control" id="calendarActionType">
+                                            <option value="">Add action for this date...</option>
+                                        </select>
+                                        <button class="btn btn--primary btn--full-width" id="addCalendarAction">Add Action</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Profile Section -->
+            <section id="profile" class="section">
+                <div class="container">
+                    <div class="section-header">
+                        <h1>Profile Settings</h1>
+                        <p>Customize your goals and action types</p>
+                    </div>
+
+                    <div class="profile-grid">
+                        <!-- Target Goal Settings -->
+                        <div class="card">
+                            <div class="card__body">
+                                <h3>Target Goal</h3>
+                                <div class="form-group">
+                                    <label class="form-label">Starting Debt (₹)</label>
+                                    <input type="number" class="form-control" id="targetGoalInput" value="20000">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Daily Reminder</label>
+                                    <input type="time" class="form-control" id="reminderTime" value="20:00">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Theme</label>
+                                    <select class="form-control" id="themeSelect">
+                                        <option value="light">Light</option>
+                                        <option value="dark">Dark</option>
+                                    </select>
+                                </div>
+                                <button class="btn btn--primary" id="saveSettings">Save Settings</button>
+                                
+                                <div class="danger-zone" style="margin-top: var(--space-24); padding-top: var(--space-24); border-top: 1px solid var(--color-border);">
+                                    <h4 style="color: var(--color-error); margin-bottom: var(--space-16);">Danger Zone</h4>
+                                    <button class="btn btn--outline" id="resetDataBtn" style="border-color: var(--color-error); color: var(--color-error);">Reset All Data</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quick Actions Selection -->
+                        <div class="card">
+                            <div class="card__body">
+                                <h3>Quick Actions</h3>
+                                <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-16);">
+                                    Select which actions appear in the dashboard quick actions section
+                                </p>
+                                <div id="quickActionsSelection">
+                                    <!-- Will be populated by JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Positive Action Types -->
+                        <div class="card">
+                            <div class="card__body">
+                                <h3>Positive Actions</h3>
+                                <div class="action-types-list" id="positiveActionsList">
+                                    <!-- Will be populated by JavaScript -->
+                                </div>
+                                <div class="add-action-type-form">
+                                    <input type="text" class="form-control" id="newPositiveActionName" placeholder="Action name">
+                                    <input type="number" class="form-control" id="newPositiveActionValue" placeholder="Points">
+                                    <button class="btn btn--secondary" id="addPositiveActionType">Add</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Negative Action Types -->
+                        <div class="card">
+                            <div class="card__body">
+                                <h3>Negative Actions</h3>
+                                <div class="action-types-list" id="negativeActionsList">
+                                    <!-- Will be populated by JavaScript -->
+                                </div>
+                                <div class="add-action-type-form">
+                                    <input type="text" class="form-control" id="newNegativeActionName" placeholder="Action name">
+                                    <input type="number" class="form-control" id="newNegativeActionValue" placeholder="Points (will be negative)">
+                                    <button class="btn btn--secondary" id="addNegativeActionType">Add</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Badge Progress -->
+                        <div class="card">
+                            <div class="card__body">
+                                <h3>Badge Progress</h3>
+                                <div class="badge-progress-list" id="badgeProgressList">
+                                    <!-- Will be populated by JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Mobile Navigation -->
+        <nav class="nav-mobile">
+            <button class="nav-mobile-link active" data-section="dashboard">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Dashboard</span>
+            </button>
+            <button class="nav-mobile-link" data-section="workout">
+                <span class="nav-icon">💪</span>
+                <span class="nav-label">Workout</span>
+            </button>
+            <button class="nav-mobile-link" data-section="calendar">
+                <span class="nav-icon">📅</span>
+                <span class="nav-label">Calendar</span>
+            </button>
+            <button class="nav-mobile-link" data-section="profile">
+                <span class="nav-icon">👤</span>
+                <span class="nav-label">Profile</span>
+            </button>
+        </nav>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
