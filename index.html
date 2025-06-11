@@ -20,6 +20,9 @@
 </head>
 <body>
     <div id="app">
+        <!-- Auth Section (hidden by default) -->
+        <div id="auth" style="display: none;"></div>
+        
         <!-- Top Navigation -->
         <nav class="nav-top">
             <div class="nav-container">
@@ -51,8 +54,10 @@
             <h1 class="mobile-logo">Habitide</h1>
         </header>
 
-        <!-- Main Content -->
-        <main class="main-content">
+        <!-- Main Container -->
+        <div id="main-container">
+            <!-- Main Content -->
+            <main class="main-content">
             <!-- Dashboard Section -->
             <section id="dashboard" class="section active">
                 <!-- Dashboard content will be rendered by JavaScript -->
@@ -214,6 +219,7 @@
                 </div>
             </section>
         </main>
+        </div>
 
         <!-- Mobile Navigation -->
         <nav class="nav-mobile">

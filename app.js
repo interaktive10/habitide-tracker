@@ -733,54 +733,85 @@ class HabitideApp {
   }
 
   async init() {
-    try {
-      this.showLoadingOverlay();
-      // Check authentication
-      await this.checkAuth();
-      if (this.user) {
-        // User is authenticated - load data and initialize app
-        await this.loadData();
-        await this.loadActionTypes();
-        
-        // Check for automatic Sunday reset
-        this.checkWeeklyReset();
-        // Apply theme immediately after loading settings but prioritize localStorage
-        const savedTheme = localStorage.getItem('habitide-theme') || this.data.settings.theme;
-        this.setTheme(savedTheme);
-        // Initialize date
-        this.setTodayDate();
-        // Ensure main sections exist before rendering
-        this.ensureMainSectionsExist();
-        // Reset render flags for fresh start
-        this.resetRenderFlags();
-        // Hide auth UI and show main app
-        this.hideAuthUI();
-        // Initial render (only after data and sections are ready)
-        await this.renderAll();
-        // Setup event listeners
-        this.reAttachEventListeners();
-        // Navigate to dashboard as default
-        await this.navigateToSection('dashboard');
-        // Setup notifications
-        await this.requestNotificationPermission();
-        // Setup daily reminder
-        this.setupDailyReminder();
-        // Default action types are now handled by database setup
-        // await this.ensureUserHasDefaultActionTypes(); // DISABLED - using new 16 actions from DB
-        // Removed welcome notification
+    console.log('HabitideApp: Starting initialization');
+    
+    // Initialize theme first
+    this.initializeTheme();
+    
+    // Check for localStorage session first (for backward compatibility)
+    const savedUser = localStorage.getItem('habitide-user');
+    if (savedUser) {
+      try {
+        this.user = JSON.parse(savedUser);
+        console.log('HabitideApp: Found localStorage user:', this.user.id);
+        await this.postAuthenticationFlow(this.user);
+        return;
+      } catch (error) {
+        console.error('HabitideApp: Error parsing saved user:', error);
+        localStorage.removeItem('habitide-user');
+      }
+    }
+    
+    // Set up Supabase auth state listener as fallback
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('HabitideApp: Auth state changed:', event, session?.user?.id);
+      
+      if (session?.user) {
+        console.log('HabitideApp: User authenticated via Supabase:', session.user.id);
+        this.user = { id: session.user.id, username: session.user.email?.split('@')[0] || 'user' };
+        await this.postAuthenticationFlow(session.user);
       } else {
-        // User not authenticated - show auth UI
-        // Apply default light theme even when not logged in
-        this.setTheme('light');
+        console.log('HabitideApp: No authenticated user');
         this.showAuthUI();
       }
+    });
+    
+    // Set up visibility change handler
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    
+    console.log('HabitideApp: Initialization complete');
+  }
+
+  async postAuthenticationFlow(user) {
+    console.log('HabitideApp: Starting post-authentication flow');
+    console.log('HabitideApp: User object in postAuthenticationFlow:', user);
+    console.log('HabitideApp: this.user is:', this.user);
+    if (!user || !user.id) {
+        this.showNotification('User authentication failed. Please sign in again.', 'error');
+        this.showAuthUI();
+        return;
+    }
+    try {
+        this.showLoadingOverlay();
+        this.hideAuthUI();
+        await this.loadData();
+        await this.loadActionTypes();
+        await this.ensureUserProfile();
+        await this.ensureUserHasDefaultActionTypes();
+        this.ensureMainSectionsExist();
+        await this.renderDashboard();
+        this.reAttachEventListeners();
+        
+        // Short delay to ensure DOM rendering completes
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Navigate to dashboard with double requestAnimationFrame to ensure DOM is painted
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                this.navigateToSection('dashboard');
+            });
+        });
+        
+        console.log('HabitideApp: Post-authentication flow complete');
     } catch (error) {
-      console.error('Initialization error:', error);
-      this.showNotification(MESSAGES.ERROR.DATABASE_ERROR, 'error');
-      // Fallback to auth UI on any error
-      this.showAuthUI();
+        console.error('HabitideApp: Post-authentication flow error:', error, error.stack);
+        this.showNotification('Failed to load application data. Please try again.', 'error');
+        requestAnimationFrame(() => {
+            this.hideAuthUI();
+            this.navigateToSection('dashboard');
+        });
     } finally {
-      this.hideLoadingOverlay();
+        this.hideLoadingOverlay();
     }
   }
 
@@ -1167,48 +1198,56 @@ class HabitideApp {
   }
 
   async navigateToSection(sectionName) {
-    // Remove active class from all sections
-    const sections = document.querySelectorAll('.section');
-    sections.forEach(section => section.classList.remove('active'));
+    console.log('HabitideApp: Navigating to section:', sectionName);
     
-    // Remove active class from all nav links (both desktop and mobile)
+    // Ensure main container is visible
+    const mainContainer = document.getElementById('main-container') || document.querySelector('.app-container');
+    if (mainContainer) {
+        mainContainer.style.setProperty('display', 'block', 'important');
+    }
+    
+    // Remove active class and hide all sections
+    const sections = document.querySelectorAll('.section');
+    sections.forEach(section => {
+        section.classList.remove('active');
+        section.style.display = 'none';
+    });
+    
+    // Remove active class from all nav links
     const navLinks = document.querySelectorAll('.nav-link, .nav-mobile-link');
     navLinks.forEach(link => link.classList.remove('active'));
     
-    // Add active class to target section
+    // Add active class and show target section
     const targetSection = document.getElementById(sectionName);
     if (targetSection) {
-      targetSection.classList.add('active');
+        targetSection.classList.add('active');
+        targetSection.style.setProperty('display', 'block', 'important');
+        console.log('HabitideApp: Section styled:', sectionName, targetSection.style.display);
+    } else {
+        console.error('HabitideApp: Section not found:', sectionName);
     }
     
-    // Add active class to corresponding nav link (both desktop and mobile)
+    // Add active class to corresponding nav link
     const activeNavLink = document.querySelector(`.nav-link[data-section="${sectionName}"], .nav-mobile-link[data-section="${sectionName}"]`);
     if (activeNavLink) {
-      activeNavLink.classList.add('active');
+        activeNavLink.classList.add('active');
     }
     
-    // Re-render section-specific content if needed
-    if (sectionName === 'calendar') {
-      this.renderCalendar();
-    } else if (sectionName === 'workout') {
-      this.renderWorkout();
-    } else if (sectionName === 'profile') {
-      this.renderProfile();
-    } else if (sectionName === 'dashboard') {
-      // Data freshness check: 1 minute (60000 ms) threshold
-      const now = Date.now();
-      const isStale = !this.data.lastFetched || (now - this.data.lastFetched > 60000);
-      if (isStale) {
-        await this.loadData();
-        await this.loadActionTypes();
-      }
-      this.updateDashboardStats();
-      this.renderQuickActions();
-      this.renderRecentActivities();
-    }
-    
-    // Mark sections as needing re-render when navigating
-    if (targetSection) targetSection.dataset.rendered = 'false';
+    // Re-render section-specific content
+    requestAnimationFrame(async () => {
+        if (sectionName === 'calendar') {
+            await this.renderCalendar();
+        } else if (sectionName === 'workout') {
+            await this.renderWorkout();
+        } else if (sectionName === 'profile') {
+            await this.renderProfile();
+        } else if (sectionName === 'dashboard') {
+            this.updateDashboardStats();
+            await this.renderQuickActions();
+            await this.renderRecentActivities();
+        }
+        console.log('HabitideApp: Navigation to', sectionName, 'complete');
+    });
   }
 
   renderAll() {
@@ -3516,6 +3555,8 @@ class HabitideApp {
     if (!container) return;
     
     console.log('renderQuickActions called - rendered flag:', container.dataset.rendered);
+    console.log('Quick Actions Debug: this.data.actionTypes:', this.data.actionTypes);
+    console.log('Quick Actions Debug: this.data.settings:', this.data.settings);
     
     const settings = this.data.settings || {};
     const selectedActionIds = settings.quickActions || [];
@@ -4097,32 +4138,105 @@ class HabitideApp {
 
   // Authentication and UI methods
   hideAuthUI() {
-    // Hide auth UI 
     const authSection = document.getElementById('auth');
     if (authSection) {
       authSection.style.display = 'none';
+      console.log('HabitideApp: Auth section hidden successfully');
+    } else {
+      console.error('HabitideApp: Auth section not found');
     }
-    
-    // Show top navigation 
+
+    const mainContainer = document.getElementById('main-container') || document.querySelector('.app-container') || document.querySelector('main');
+    if (mainContainer) {
+      mainContainer.style.setProperty('display', 'block', 'important');
+      console.log('HabitideApp: Main container found and styled:', mainContainer.id || mainContainer.className);
+    } else {
+      console.error('HabitideApp: Main container not found');
+    }
+
+    const sections = ['dashboard', 'workout', 'calendar', 'profile'];
+    sections.forEach(id => {
+      const section = document.getElementById(id);
+      if (section) {
+        section.style.display = '';
+      }
+    });
+
     const navTop = document.querySelector('.nav-top');
     if (navTop) navTop.style.display = 'block';
     
-    // For mobile nav and mobile header, remove any inline styles and let CSS media queries handle visibility
     const navMobile = document.querySelector('.nav-mobile');
     const mobileHeader = document.querySelector('.mobile-header');
     
-    if (navMobile) navMobile.style.display = ''; // Remove inline style, let CSS handle it
-    if (mobileHeader) mobileHeader.style.display = ''; // Remove inline style, let CSS handle it
+    if (navMobile) navMobile.style.display = '';
+    if (mobileHeader) mobileHeader.style.display = '';
     
-    // Don't force show all sections - let the navigation system handle which section is active
+    document.body.style.overflow = '';
+    document.body.classList.remove('auth-mode');
+    document.body.classList.add('app-mode');
+    
+    // Add debug CSS to ensure section visibility
+    const debugStyle = document.createElement('style');
+    debugStyle.id = 'debug-section-visibility';
+    debugStyle.textContent = `
+      body.app-mode .app-container,
+      body.app-mode #main-container {
+        display: block !important;
+      }
+      body.auth-mode .app-container,
+      body.auth-mode #main-container {
+        display: none !important;
+      }
+      .section.active {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+      }
+      .section:not(.active) {
+        display: none !important;
+      }
+      #main-container {
+        display: block !important;
+      }
+    `;
+    
+    // Remove existing debug style if present to avoid duplicates
+    const existingDebugStyle = document.getElementById('debug-section-visibility');
+    if (existingDebugStyle) {
+      existingDebugStyle.remove();
+    }
+    
+    document.head.appendChild(debugStyle);
+    
+    console.log('HabitideApp: Auth UI hidden, main UI shown');
   }
 
   showAuthUI() {
+    // Hide main app container
+    const mainContainer = document.getElementById('main-container') || document.querySelector('.app-container') || document.querySelector('main');
+    if (mainContainer) {
+      mainContainer.style.display = 'none';
+    }
+
+    // Hide main sections
     const sections = ['dashboard', 'workout', 'calendar', 'profile'];
     sections.forEach(sectionId => {
       const section = document.getElementById(sectionId);
       if (section) section.style.display = 'none';
     });
+
+    // Hide navigation
+    const navTop = document.querySelector('.nav-top');
+    const navMobile = document.querySelector('.nav-mobile');
+    const mobileHeader = document.querySelector('.mobile-header');
+    
+    if (navTop) navTop.style.display = 'none';
+    if (navMobile) navMobile.style.display = 'none';
+    if (mobileHeader) mobileHeader.style.display = 'none';
+
+    // Set body to auth mode
+    document.body.classList.remove('app-mode');
+    document.body.classList.add('auth-mode');
 
     const authSection = document.getElementById('auth') || document.body;
     authSection.innerHTML = `
@@ -4256,21 +4370,23 @@ class HabitideApp {
       
       if (insertError) throw insertError;
       
-      // Set user and initialize app
       this.user = { id: newUser.id, username: newUser.username };
       localStorage.setItem('habitide-user', JSON.stringify(this.user));
       
-      // Create default action types for new user
       await this.ensureUserHasDefaultActionTypes();
       
-      this.hideLoadingOverlay();
+      // Pass user to postAuthenticationFlow
+      await this.postAuthenticationFlow(this.user);
       this.showNotification('Account created successfully!', 'success');
-      await this.init();
       
     } catch (error) {
       console.error('Sign-up error:', error);
       this.hideLoadingOverlay();
       errorElement.textContent = 'Failed to create account. Please try again.';
+      requestAnimationFrame(() => {
+        this.hideAuthUI();
+        this.navigateToSection('dashboard');
+      });
     }
   }
 
@@ -4311,34 +4427,51 @@ class HabitideApp {
         return;
       }
       
-      // Set user and initialize app
       this.user = { id: userData.id, username: userData.username };
       localStorage.setItem('habitide-user', JSON.stringify(this.user));
       
-      this.hideLoadingOverlay();
+      console.log('HabitideApp: USER SET TO:', this.user);
+      
+      // Rely on postAuthenticationFlow for navigation
+      await this.postAuthenticationFlow(this.user);
       this.showNotification('Signed in successfully!', 'success');
-      await this.init();
       
     } catch (error) {
       console.error('Sign-in error:', error);
       this.hideLoadingOverlay();
       errorElement.textContent = 'Failed to sign in. Please try again.';
+      requestAnimationFrame(() => {
+        this.hideAuthUI();
+        this.navigateToSection('dashboard');
+      });
     }
   }
 
   signOut() {
+    // Clear local data immediately
     this.user = null;
     localStorage.removeItem('habitide-user');
+    
+    // Sign out from Supabase silently (don't wait for it)
+    supabase.auth.signOut().catch(error => {
+      console.log('Supabase signout error (ignored):', error);
+    });
+    
     this.showAuthUI();
     this.showNotification('Signed out successfully', 'info');
   }
 
   // Data management methods
   async loadData() {
-    if (!this.user) return;
+    console.log('HabitideApp: Starting loadData');
+    if (!this.user) {
+      console.log("HabitideApp: NO USER SET - Cannot load data");
+      return;
+    }
     
     try {
       console.log("HabitideApp: Loading data for user:", this.user.id);
+      console.log("HabitideApp: User object:", this.user);
       
       // Load actions
       const { data: actions, error: actionsError } = await supabase
@@ -4351,6 +4484,8 @@ class HabitideApp {
         console.error("HabitideApp: Actions query error:", actionsError);
         throw actionsError;
       }
+      
+      console.log("HabitideApp: Actions loaded:", actions?.length || 0, "actions found");
 
       // Load settings from profiles table
       const { data: profile, error: profileError } = await supabase
@@ -4383,6 +4518,7 @@ class HabitideApp {
         this.data.workoutState = {};
       }
       this.data.lastFetched = Date.now(); // Update lastFetched after data fetch
+      console.log('HabitideApp: loadData complete');
 
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -4411,7 +4547,10 @@ class HabitideApp {
   }
 
   async loadActionTypes() {
-    if (!this.user) return;
+    if (!this.user) {
+      console.log("HabitideApp: NO USER SET - Cannot load action types");
+      return;
+    }
 
     try {
       console.log("HabitideApp: Loading action types for user:", this.user.id);
@@ -4429,6 +4568,7 @@ class HabitideApp {
       }
 
       console.log("HabitideApp: Action types loaded:", actionTypes?.length || 0);
+      console.log("HabitideApp: Raw action types:", actionTypes);
 
       // Remove duplicates by keeping user's version over default
       const uniqueActionTypes = [];
@@ -4455,6 +4595,9 @@ class HabitideApp {
       };
 
       console.log("HabitideApp: Action types grouped - Positive:", this.data.actionTypes.positive.length, "Negative:", this.data.actionTypes.negative.length);
+      console.log("HabitideApp: Positive action types:", this.data.actionTypes.positive);
+      console.log("HabitideApp: Negative action types:", this.data.actionTypes.negative);
+      console.log('HabitideApp: loadActionTypes complete');
 
     } catch (error) {
       console.error('Failed to load action types:', error);
@@ -5124,7 +5267,9 @@ class HabitideApp {
   }
 }
 
-// Initialize app
-const app = new HabitideApp();
-app.init();
-window.app = app;
+// Initialize app after DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+  const app = new HabitideApp();
+  app.init();
+  window.app = app;
+});
