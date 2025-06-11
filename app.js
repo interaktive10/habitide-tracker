@@ -1589,14 +1589,8 @@ class HabitideApp {
     
     section.innerHTML = `
       <div class="container">
-        <div class="dashboard-header">
-          <div class="dashboard-title">
-            <h1>Dashboard</h1>
-          </div>
-        </div>
-
         <!-- Progress Overview -->
-        <div class="card progress-overview">
+        <div class="dashboard-section card progress-overview">
           <div class="card__body">
             <h3>Progress Overview</h3>
             <div class="progress-stats">
@@ -1617,7 +1611,7 @@ class HabitideApp {
                 <span class="stat-value negative" id="totalLost"></span>
               </div>
             </div>
-            <div class="goal-progress">
+            <div class="goal-progress" style="margin-top: var(--space-32);">
               <div class="progress-header">
                 <span class="progress-title">Goal Progress</span>
                 <span class="progress-percentage" id="progressPercentage"></span>
@@ -1629,39 +1623,41 @@ class HabitideApp {
                 <span id="progressDescription"></span>
               </div>
             </div>
-            <div class="dashboard-actions" style="margin-top: var(--space-24); text-align: center;">
-              <button class="btn btn--primary add-action-modal-btn" id="openAddActionModal">
-                <span class="btn-icon">➕</span>
-                <span class="btn-text">Add Action</span>
-              </button>
+          </div>
+        </div>
+
+        <!-- Add Action Section -->
+        <div class="dashboard-section card add-action-section">
+          <div class="card__body" style="text-align: center; padding: var(--space-20);">
+            <button class="btn btn--primary add-action-modal-btn" id="openAddActionModal">
+              <span class="btn-icon">➕</span>
+              <span class="btn-text">Add Action</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Actions - Today -->
+        <div class="dashboard-section card quick-actions-card">
+          <div class="card__body">
+            <h3>Quick Actions - Today</h3>
+            <div class="quick-actions-grid" id="quickActionsContainer">
+              <!-- Quick actions will be populated here -->
             </div>
           </div>
         </div>
 
-        <div class="dashboard-bottom">
-          <!-- Quick Actions - Today -->
-          <div class="card quick-actions-card">
-            <div class="card__body">
-              <h3>Quick Actions - Today</h3>
-              <div class="quick-actions-grid" id="quickActionsContainer">
-                <!-- Quick actions will be populated here -->
-              </div>
-            </div>
-          </div>
-
-          <!-- Recent Activities -->
-          <div class="card activities-card">
-            <div class="card__body">
-              <h3>Recent Activities</h3>
-              <div class="activities-list" id="recentActivities">
-                <!-- Recent activities will be populated here -->
-              </div>
+        <!-- Recent Activities -->
+        <div class="dashboard-section card activities-card">
+          <div class="card__body">
+            <h3>Recent Activities</h3>
+            <div class="activities-list" id="recentActivities">
+              <!-- Recent activities will be populated here -->
             </div>
           </div>
         </div>
 
         <!-- Achievement Badges -->
-        <div class="achievement-badges-section">
+        <div class="dashboard-section achievement-badges-section">
           <h2 class="badges-title">Achievement Badges</h2>
           <div class="badges-grid badges-simple" id="badgesContainer">
             <!-- Badges will be populated here -->
@@ -4101,18 +4097,24 @@ class HabitideApp {
 
   // Authentication and UI methods
   hideAuthUI() {
-    // Hide auth UI and show main sections
+    // Hide auth UI 
     const authSection = document.getElementById('auth');
     if (authSection) {
       authSection.style.display = 'none';
     }
     
-    // Show main app sections
-    const sections = ['dashboard', 'workout', 'calendar', 'profile'];
-    sections.forEach(sectionId => {
-      const section = document.getElementById(sectionId);
-      if (section) section.style.display = 'block';
-    });
+    // Show top navigation 
+    const navTop = document.querySelector('.nav-top');
+    if (navTop) navTop.style.display = 'block';
+    
+    // For mobile nav and mobile header, remove any inline styles and let CSS media queries handle visibility
+    const navMobile = document.querySelector('.nav-mobile');
+    const mobileHeader = document.querySelector('.mobile-header');
+    
+    if (navMobile) navMobile.style.display = ''; // Remove inline style, let CSS handle it
+    if (mobileHeader) mobileHeader.style.display = ''; // Remove inline style, let CSS handle it
+    
+    // Don't force show all sections - let the navigation system handle which section is active
   }
 
   showAuthUI() {

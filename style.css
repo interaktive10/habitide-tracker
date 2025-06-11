@@ -747,6 +747,7 @@ select.form-control {
 
 .card__body {
   padding: var(--space-32);
+  text-align: left;
 }
 
 /* --- App Layout --- */
@@ -965,7 +966,7 @@ select.form-control {
 
 /* Mobile Header */
 .mobile-header {
-  display: none;
+  display: none !important;
 }
 
 @media (max-width: 768px) {
@@ -1215,6 +1216,8 @@ select.form-control {
   padding: var(--space-24);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .progress-header {
@@ -2141,7 +2144,7 @@ select.form-control {
 
 .quick-actions-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--space-16);
   max-height: 240px; /* Show approximately 4 actions (2 rows) */
   overflow-y: auto;
@@ -4392,14 +4395,26 @@ html[data-color-scheme="dark"] *,
   background: transparent;
 }
 
-/* Prominent Add Action Section */
+/* Dashboard Add Action Section */
 .add-action-section {
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  padding: var(--space-32);
-  border: 1px solid var(--color-border);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  margin-bottom: var(--space-48);
+  margin: var(--space-24) 0;
+}
+
+.add-action-section .card__body {
+  padding: var(--space-20) !important;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .add-action-section {
+    margin: var(--space-20) 0;
+  }
+  
+  .add-action-section .add-action-modal-btn {
+    width: 100%;
+    padding: var(--space-16) var(--space-24);
+    font-size: var(--font-size-lg);
+  }
 }
 
 .add-action-form {
@@ -5541,4 +5556,43 @@ html[data-color-scheme="dark"] *,
   background: linear-gradient(135deg, #059669, #047857);
   box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
   transform: translateY(-1px);
+}
+
+/* Standardized dashboard section spacing */
+.dashboard-section {
+  margin-bottom: var(--space-32) !important;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+}
+
+@media (max-width: 768px) {
+  .dashboard-section {
+    margin-bottom: var(--space-24) !important;
+  }
+}
+
+.dashboard-section:last-child {
+  margin-bottom: 0 !important;
+}
+
+.card,
+.card__body,
+.activities-card {
+  border-bottom: none !important;
+  margin-bottom: 0 !important;
+}
+
+/* Rounded badge corners */
+.badge-simple,
+.badge-item,
+.badges-grid > .badge-item {
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden;
+}
+
+.badges-grid,
+.badges-simple-grid {
+  gap: var(--space-16) !important;
+  align-items: stretch;
 }
