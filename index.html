@@ -11,7 +11,9 @@
     <meta name="format-detection" content="telephone=no">
     <title>Habitide - Fitness & Financial Tracker</title>
     <base href="/">
-    <link rel="icon" href="data:,">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="alternate icon" href="favicon.svg">
+    <link rel="mask-icon" href="favicon.svg" color="#6366f1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&display=swap" rel="stylesheet">
@@ -30,7 +32,7 @@
                     <h2>Habitide</h2>
                 </div>
                 <div class="nav-links">
-                    <button class="nav-link active" data-section="dashboard">
+                    <button class="nav-link" data-section="dashboard">
                         <span>📊</span> Dashboard
                     </button>
                     <button class="nav-link" data-section="workout">
@@ -59,7 +61,7 @@
             <!-- Main Content -->
             <main class="main-content">
             <!-- Dashboard Section -->
-            <section id="dashboard" class="section active">
+            <section id="dashboard" class="section">
                 <!-- Dashboard content will be rendered by JavaScript -->
                 <div class="loading-skeleton">
                     <div class="skeleton-card"></div>
@@ -223,7 +225,7 @@
 
         <!-- Mobile Navigation -->
         <nav class="nav-mobile">
-            <button class="nav-mobile-link active" data-section="dashboard">
+            <button class="nav-mobile-link" data-section="dashboard">
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">Dashboard</span>
             </button>

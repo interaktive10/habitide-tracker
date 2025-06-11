@@ -1900,6 +1900,23 @@ select.form-control {
   box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.1);
 }
 
+.exercise-input[readonly] {
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+  border-color: var(--color-border);
+}
+
+.exercise-input[readonly]:focus {
+  border-color: var(--color-border);
+  box-shadow: none;
+}
+
+.phase-card.custom-exercises {
+  border-left: 4px solid var(--color-primary);
+  background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.05), rgba(var(--primary-rgb), 0.02));
+}
+
 .remove-exercise-btn {
   background: var(--color-error);
   color: white;

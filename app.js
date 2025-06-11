@@ -426,292 +426,276 @@ const isValidEmail = (email) => {
 // Main app class
 class HabitideApp {
   constructor() {
-    // Initialize before anything else to prevent flickering
-    this.initializeTheme();
+    console.log('HabitideApp: Constructor called');
     
+    // Initialize properties
     this.user = null;
-    this.currentDate = new Date();
-    this.selectedDate = new Date();
-    this.eventListenersAttached = false;
-    
-    // Debounced save function to prevent excessive database calls
-    this.debouncedSave = PerformanceUtils.debounce(() => this.saveDataToDatabase(), 500);
-    
-    // Initialize data structure
     this.data = {
-      settings: { targetGoal: 20000, reminderTime: '20:00', theme: 'light', quickActions: [1, 2, 3, 4] },
       actions: [],
-      workoutProgress: {},
+      settings: { 
+        targetGoal: 20000, 
+        reminderTime: '20:00', 
+        theme: 'light', 
+        quickActions: [1, 2, 3, 4] 
+      },
+      actionTypes: { positive: [], negative: [] },
       customWorkouts: {},
       workoutState: {},
-      actionTypes: { positive: [], negative: [] },
-      badges: [
-        // Milestone badges
-        { id: 1, name: "First Step", icon: "🎯", type: "milestone", requirement: 1, description: "Complete your first action", earned: false },
-        
-        // Streak badges
-        { id: 2, name: "Week Warrior", icon: "🔥", type: "streak", requirement: 7, description: "7-day streak", earned: false },
-        { id: 3, name: "Month Master", icon: "💎", type: "streak", requirement: 30, description: "30-day streak", earned: false },
-        { id: 4, name: "Hundred Hero", icon: "👑", type: "streak", requirement: 100, description: "100-day streak", earned: false },
-        
-        // Savings badges (debt reduction)
-        { id: 5, name: "Quarter Crusher", icon: "⭐", type: "savings", requirement: 0.25, description: "Reduce debt by 25%", earned: false },
-        { id: 6, name: "Half Hero", icon: "🌟", type: "savings", requirement: 0.5, description: "Reduce debt by 50%", earned: false },
-        { id: 7, name: "Debt Destroyer", icon: "💰", type: "savings", requirement: 1.0, description: "Eliminate all debt", earned: false },
-        
-        // Action count badges
-        { id: 8, name: "Action Hero", icon: "💪", type: "actions", requirement: 50, description: "Complete 50 positive actions", earned: false },
-        { id: 9, name: "Century Club", icon: "🏆", type: "actions", requirement: 100, description: "Complete 100 positive actions", earned: false },
-        { id: 10, name: "Thousand Strong", icon: "🎖️", type: "actions", requirement: 1000, description: "Complete 1000 positive actions", earned: false }
-      ],
-      lastFetched: null, // Add lastFetched timestamp
-      lastWeeklyReset: null // Track when last Sunday reset happened
+      lastFetched: 0
     };
 
-    // 7-day workout routines with supersets and time tracking
+    // Initialize workout routines (YOUR ACTUAL WORKOUT PLAN)
     this.workoutRoutines = {
       Monday: {
         focus: "Strength Training - Full Body",
-        totalTime: "45-50 min",
+        totalTime: "45-60 mins",
         phases: [
           {
             type: "warmup",
             name: "Warm-up",
-            duration: "5 min",
+            duration: "5 mins",
             exercises: [
-              { name: "Light Cardio", duration: "5 min", description: "Treadmill, bike, or light jogging" }
+              { name: "Light cardio", duration: "5 mins" }
             ]
           },
           {
             type: "superset",
             name: "Superset 1",
-            restTime: "1-2 min",
             exercises: [
-              { name: "Squats", sets: 3, reps: "8-12", notes: "Focus on form and depth" },
-              { name: "Bench Press", sets: 3, reps: "8-12", notes: "Control the negative" }
-            ]
+              { name: "Squats", sets: 3, reps: "8-12", notes: "Focus on form" },
+              { name: "Bench Press", sets: 3, reps: "8-12", notes: "Control the weight" }
+            ],
+            restTime: "1-2 minutes between supersets"
           },
           {
             type: "single",
             name: "Deadlifts",
-            restTime: "1-2 min",
             exercises: [
-              { name: "Deadlifts", sets: 3, reps: "8-12", notes: "Keep back straight, drive through heels" }
-            ]
+              { name: "Deadlifts", sets: 3, reps: "8-12", notes: "Keep back straight" }
+            ],
+            restTime: "1-2 minutes between sets"
           },
           {
             type: "superset",
             name: "Superset 2",
-            restTime: "1-2 min",
             exercises: [
-              { name: "Overhead Press", sets: 3, reps: "8-12", notes: "Full range of motion" },
+              { name: "Overhead Press", sets: 3, reps: "8-12", notes: "Engage core" },
               { name: "Bent-over Rows", sets: 3, reps: "8-12", notes: "Squeeze shoulder blades" }
-            ]
+            ],
+            restTime: "1-2 minutes between supersets"
           },
           {
             type: "single",
             name: "Core Work",
-            restTime: "1 min",
             exercises: [
-              { name: "Planks", sets: 3, reps: "30-60s", notes: "Keep body straight" }
-            ]
+              { name: "Planks", sets: 3, reps: "30-60 seconds", notes: "Keep straight line" }
+            ],
+            restTime: "1 minute between sets"
           },
           {
             type: "cooldown",
             name: "Cool-down",
-            duration: "5 min",
+            duration: "5 mins",
             exercises: [
-              { name: "Stretching", duration: "5 min", description: "Focus on worked muscle groups" }
+              { name: "Stretching", duration: "5 mins" }
             ]
           }
         ]
       },
       Tuesday: {
         focus: "Cardio - HIIT",
-        totalTime: "25-30 min",
+        totalTime: "25-30 mins",
         phases: [
           {
             type: "warmup",
             name: "Warm-up",
-            duration: "5 min",
+            duration: "5 mins",
             exercises: [
-              { name: "Light Jogging", duration: "5 min", description: "Prepare for high intensity" }
+              { name: "Light jogging", duration: "5 mins" }
             ]
           },
           {
             type: "hiit",
             name: "HIIT Circuit",
-            duration: "15-20 min",
             exercises: [
-              { name: "Sprint Intervals", duration: "15-20 min", description: "15 rounds of 30s sprint + 30s rest. Push hard during sprints!" }
-            ]
+              { name: "Sprint intervals", sets: 1, reps: "15-20 minutes", notes: "30s sprint, 30s rest - repeat" }
+            ],
+            restTime: "30 seconds rest between sprints"
           },
           {
             type: "cooldown",
             name: "Cool-down",
-            duration: "5 min",
+            duration: "5 mins",
             exercises: [
-              { name: "Walking & Stretching", duration: "5 min", description: "Gradual heart rate recovery" }
+              { name: "Walking and stretching", duration: "5 mins" }
             ]
           }
         ]
       },
       Wednesday: {
         focus: "Strength Training - Full Body",
-        totalTime: "45-50 min",
+        totalTime: "45-60 mins",
         phases: [
           {
             type: "warmup",
             name: "Warm-up",
-            duration: "5 min",
+            duration: "5 mins",
             exercises: [
-              { name: "Light Cardio", duration: "5 min", description: "Dynamic movements preferred" }
+              { name: "Light cardio", duration: "5 mins" }
             ]
           },
           {
             type: "superset",
             name: "Superset 1",
-            restTime: "1-2 min",
             exercises: [
-              { name: "Lunges", sets: 3, reps: "10/leg", notes: "Alternate legs or single leg focus" },
-              { name: "Push-ups", sets: 3, reps: "to failure", notes: "Modify as needed" }
-            ]
+              { name: "Lunges", sets: 3, reps: "10 per leg", notes: "Alternate legs" },
+              { name: "Push-ups", sets: 3, reps: "To failure", notes: "Maintain form" }
+            ],
+            restTime: "1-2 minutes between supersets"
           },
           {
             type: "superset",
             name: "Superset 2",
-            restTime: "1-2 min",
             exercises: [
-              { name: "Pull-ups/Lat Pulldowns", sets: 3, reps: "8-12", notes: "Use assistance if needed" },
-              { name: "Dumbbell Shoulder Press", sets: 3, reps: "8-12", notes: "Control the movement" }
-            ]
+              { name: "Pull-ups/Lat Pulldowns", sets: 3, reps: "8-12", notes: "Full range of motion" },
+              { name: "Dumbbell Shoulder Press", sets: 3, reps: "8-12", notes: "Control the weight" }
+            ],
+            restTime: "1-2 minutes between supersets"
           },
           {
             type: "superset",
             name: "Superset 3",
-            restTime: "1-2 min",
             exercises: [
               { name: "Hip Thrusts", sets: 3, reps: "10-15", notes: "Squeeze glutes at top" },
-              { name: "Russian Twists", sets: 3, reps: "15-20", notes: "Control the rotation" }
-            ]
+              { name: "Russian Twists", sets: 3, reps: "15-20", notes: "Keep core engaged" }
+            ],
+            restTime: "1-2 minutes between supersets"
           },
           {
             type: "cooldown",
             name: "Cool-down",
-            duration: "5 min",
+            duration: "5 mins",
             exercises: [
-              { name: "Stretching", duration: "5 min", description: "Focus on flexibility" }
+              { name: "Stretching", duration: "5 mins" }
             ]
           }
         ]
       },
       Thursday: {
         focus: "Cardio - Steady State",
-        totalTime: "30-45 min",
+        totalTime: "30-45 mins",
         phases: [
           {
             type: "cardio",
-            name: "Steady State Cardio",
-            duration: "30-45 min",
+            name: "Moderate-Intensity Cardio",
+            duration: "30-45 mins",
             exercises: [
-              { name: "Moderate Cardio", duration: "30-45 min", description: "Jogging, cycling, or elliptical at moderate intensity" }
+              { name: "Jogging", duration: "30-45 mins", notes: "Moderate pace - can hold conversation" },
+              { name: "Cycling", duration: "Alternative option" },
+              { name: "Elliptical", duration: "Alternative option" }
             ]
           }
         ]
       },
       Friday: {
         focus: "Strength Training - Full Body",
-        totalTime: "45-50 min",
+        totalTime: "45-60 mins",
         phases: [
           {
             type: "warmup",
             name: "Warm-up",
-            duration: "5 min",
+            duration: "5 mins",
             exercises: [
-              { name: "Light Cardio", duration: "5 min", description: "Prepare for strength work" }
+              { name: "Light cardio", duration: "5 mins" }
             ]
           },
           {
             type: "superset",
             name: "Superset 1",
-            restTime: "1-2 min",
             exercises: [
               { name: "Leg Press", sets: 3, reps: "10-15", notes: "Full range of motion" },
-              { name: "Incline Bench Press", sets: 3, reps: "8-12", notes: "Focus on upper chest" }
-            ]
+              { name: "Incline Bench Press", sets: 3, reps: "8-12", notes: "Control the weight" }
+            ],
+            restTime: "1-2 minutes between supersets"
           },
           {
             type: "superset",
             name: "Superset 2",
-            restTime: "1-2 min",
             exercises: [
-              { name: "Seated Rows", sets: 3, reps: "8-12", notes: "Pull to lower chest" },
-              { name: "Lateral Raises", sets: 3, reps: "12-15", notes: "Control the weight" }
-            ]
+              { name: "Seated Rows", sets: 3, reps: "8-12", notes: "Squeeze shoulder blades" },
+              { name: "Lateral Raises", sets: 3, reps: "12-15", notes: "Control the movement" }
+            ],
+            restTime: "1-2 minutes between supersets"
           },
           {
             type: "superset",
             name: "Superset 3",
-            restTime: "1 min",
             exercises: [
               { name: "Leg Raises", sets: 3, reps: "15-20", notes: "Control the movement" },
-              { name: "Planks", sets: 3, reps: "30-60s", notes: "Maintain form" }
-            ]
+              { name: "Planks", sets: 3, reps: "30-60 seconds", notes: "Keep straight line" }
+            ],
+            restTime: "1 minute between supersets"
           },
           {
             type: "cooldown",
             name: "Cool-down",
-            duration: "5 min",
+            duration: "5 mins",
             exercises: [
-              { name: "Stretching", duration: "5 min", description: "Focus on recovery" }
+              { name: "Stretching", duration: "5 mins" }
             ]
           }
         ]
       },
       Saturday: {
         focus: "Football and Running",
-        totalTime: "Variable",
+        totalTime: "60+ mins",
         phases: [
           {
             type: "activity",
-            name: "Football Game",
-            duration: "60-90 min",
+            name: "Football and Steps",
+            duration: "60+ mins",
             exercises: [
-              { name: "Football Game", duration: "60-90 min", description: "Enjoy the game and compete!" }
-            ]
-          },
-          {
-            type: "activity",
-            name: "Step Goal",
-            target: "10,000 steps",
-            exercises: [
-              { name: "Walking/Running", target: "~10,000 steps", description: "Track throughout the day" }
+              { name: "Football game", duration: "60+ mins", notes: "Enjoy the game!" },
+              { name: "Aim for ~10,000 steps", duration: "Throughout the day", notes: "Track your steps" }
             ]
           }
         ]
       },
       Sunday: {
-        focus: "Rest & Recovery",
+        focus: "Rest",
         totalTime: "Optional",
         phases: [
           {
             type: "recovery",
-            name: "Light Activity",
-            duration: "20-30 min",
+            name: "Optional Light Activity",
+            duration: "Optional",
             exercises: [
-              { name: "Walking", duration: "20-30 min", description: "Light pace, enjoy nature" },
-              { name: "Yoga/Stretching", duration: "10-20 min", description: "Focus on flexibility and relaxation" }
+              { name: "Walking", duration: "Optional", notes: "Light pace for flexibility" },
+              { name: "Yoga", duration: "Optional", notes: "Focus on flexibility and relaxation" },
+              { name: "Stretching", duration: "Optional", notes: "Gentle stretching" }
             ]
           }
         ]
       }
     };
+
+    // Cache for better performance
+    this.cache = new Map();
+    this.notificationQueue = [];
+    this.renderFlags = { shouldRenderDashboard: true, shouldRenderBadges: true };
     
-    this.invalidateStatsCache();
+    // Session expiry: 30 days
+    this.SESSION_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
     
-    this.currentSection = 'dashboard';
-    this.restTimer = null; // To hold the rest timer interval ID
-    this.authStateChangeListenerAttached = false;
+    // Performance optimizations
+    this.debouncedSave = PerformanceUtils.debounce(this.saveDataToDatabase.bind(this), CONFIG.SAVE_DEBOUNCE_DELAY);
+    this.throttledRender = PerformanceUtils.throttle(this.renderAll.bind(this), CONFIG.RENDER_THROTTLE_DELAY);
+
+    // Initialize theme from system preference if no saved preference
+    this.initializeTheme();
+
+    // Don't auto-check auth on visibility change to prevent frequent logouts
+    // Removed: document.addEventListener('visibilitychange', this.handleVisibilityChange);
   }
 
   // Add new method to initialize theme immediately
@@ -767,49 +751,47 @@ class HabitideApp {
     });
     
     // Set up visibility change handler
-    document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    // Removed auto-check auth on visibility change to prevent frequent logouts
+    // document.addEventListener('visibilitychange', this.handleVisibilityChange);
     
     console.log('HabitideApp: Initialization complete');
   }
 
   async postAuthenticationFlow(user) {
     console.log('HabitideApp: Starting post-authentication flow');
-    console.log('HabitideApp: User object in postAuthenticationFlow:', user);
-    console.log('HabitideApp: this.user is:', this.user);
     if (!user || !user.id) {
         this.showNotification('User authentication failed. Please sign in again.', 'error');
         this.showAuthUI();
         return;
     }
+    
     try {
         this.showLoadingOverlay();
         this.hideAuthUI();
+        
+        // Get the target section FIRST to set navigation immediately
+        const targetSection = localStorage.getItem('habitide-current-section') || 'dashboard';
+        console.log('HabitideApp: Target section:', targetSection);
+        
+        // Set correct navigation state immediately to prevent flash
+        this.setNavigationActiveState(targetSection);
+        
+        // Load all necessary data
         await this.loadData();
         await this.loadActionTypes();
         await this.ensureUserProfile();
         await this.ensureUserHasDefaultActionTypes();
         this.ensureMainSectionsExist();
-        await this.renderDashboard();
         this.reAttachEventListeners();
         
-        // Short delay to ensure DOM rendering completes
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
-        // Navigate to dashboard with double requestAnimationFrame to ensure DOM is painted
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                this.navigateToSection('dashboard');
-            });
-        });
+        // Navigate to the target section - let navigateToSection handle all rendering
+        await this.navigateToSection(targetSection);
         
         console.log('HabitideApp: Post-authentication flow complete');
     } catch (error) {
-        console.error('HabitideApp: Post-authentication flow error:', error, error.stack);
+        console.error('HabitideApp: Post-authentication flow error:', error);
         this.showNotification('Failed to load application data. Please try again.', 'error');
-        requestAnimationFrame(() => {
-            this.hideAuthUI();
-            this.navigateToSection('dashboard');
-        });
+        await this.navigateToSection('dashboard');
     } finally {
         this.hideLoadingOverlay();
     }
@@ -841,8 +823,21 @@ class HabitideApp {
     
     // Check localStorage for user session
     const savedUser = localStorage.getItem('habitide-user');
+    const sessionTimestamp = localStorage.getItem('habitide-session-timestamp');
     
-    if (savedUser) {
+    if (savedUser && sessionTimestamp) {
+      const sessionAge = Date.now() - parseInt(sessionTimestamp);
+      const sessionExpired = sessionAge > (30 * 24 * 60 * 60 * 1000); // 30 days
+      
+      if (sessionExpired) {
+        console.log("HabitideApp: DEBUG - Session expired, clearing user data");
+        localStorage.removeItem('habitide-user');
+        localStorage.removeItem('habitide-session-timestamp');
+        localStorage.removeItem('habitide-current-section');
+        this.user = null;
+        return;
+      }
+      
       try {
         this.user = JSON.parse(savedUser);
         console.log("HabitideApp: DEBUG - User found in localStorage:", this.user);
@@ -1197,57 +1192,65 @@ class HabitideApp {
     });
   }
 
-  async navigateToSection(sectionName) {
-    console.log('HabitideApp: Navigating to section:', sectionName);
-    
-    // Ensure main container is visible
-    const mainContainer = document.getElementById('main-container') || document.querySelector('.app-container');
-    if (mainContainer) {
-        mainContainer.style.setProperty('display', 'block', 'important');
-    }
-    
-    // Remove active class and hide all sections
-    const sections = document.querySelectorAll('.section');
-    sections.forEach(section => {
-        section.classList.remove('active');
-        section.style.display = 'none';
-    });
-    
+  setNavigationActiveState(sectionName) {
     // Remove active class from all nav links
     const navLinks = document.querySelectorAll('.nav-link, .nav-mobile-link');
     navLinks.forEach(link => link.classList.remove('active'));
-    
-    // Add active class and show target section
-    const targetSection = document.getElementById(sectionName);
-    if (targetSection) {
-        targetSection.classList.add('active');
-        targetSection.style.setProperty('display', 'block', 'important');
-        console.log('HabitideApp: Section styled:', sectionName, targetSection.style.display);
-    } else {
-        console.error('HabitideApp: Section not found:', sectionName);
-    }
     
     // Add active class to corresponding nav link
     const activeNavLink = document.querySelector(`.nav-link[data-section="${sectionName}"], .nav-mobile-link[data-section="${sectionName}"]`);
     if (activeNavLink) {
         activeNavLink.classList.add('active');
     }
+  }
+
+  async navigateToSection(sectionName) {
+    console.log('HabitideApp: Navigating to section:', sectionName);
     
-    // Re-render section-specific content
-    requestAnimationFrame(async () => {
-        if (sectionName === 'calendar') {
-            await this.renderCalendar();
+    // Store current section in localStorage for page refresh persistence
+    localStorage.setItem('habitide-current-section', sectionName);
+    
+    // Ensure main container is visible
+    const mainContainer = document.getElementById('main-container');
+    if (mainContainer) {
+        mainContainer.style.setProperty('display', 'block', 'important');
+    }
+    
+    // Hide all sections first
+    const sections = document.querySelectorAll('.section');
+    sections.forEach(section => {
+        section.classList.remove('active');
+        section.style.display = 'none';
+    });
+    
+    // Show and activate target section
+    const targetSection = document.getElementById(sectionName);
+    if (targetSection) {
+        targetSection.classList.add('active');
+        targetSection.style.setProperty('display', 'block', 'important');
+    } else {
+        console.error('HabitideApp: Section not found:', sectionName);
+        return;
+    }
+    
+    // Update navigation state
+    this.setNavigationActiveState(sectionName);
+    
+    // Render section content - this is the single place where rendering happens
+    try {
+        if (sectionName === 'dashboard') {
+            await this.renderDashboard();
         } else if (sectionName === 'workout') {
             await this.renderWorkout();
+        } else if (sectionName === 'calendar') {
+            await this.renderCalendar();
         } else if (sectionName === 'profile') {
             await this.renderProfile();
-        } else if (sectionName === 'dashboard') {
-            this.updateDashboardStats();
-            await this.renderQuickActions();
-            await this.renderRecentActivities();
         }
         console.log('HabitideApp: Navigation to', sectionName, 'complete');
-    });
+    } catch (error) {
+        console.error('HabitideApp: Error rendering section:', sectionName, error);
+    }
   }
 
   renderAll() {
@@ -1622,7 +1625,19 @@ class HabitideApp {
     console.log(`Modal dropdown populated: ${availableCount} available, ${completedCount} completed`);
   }
 
-  renderDashboard() {
+  async renderDashboard() {
+    console.log('HabitideApp: Rendering dashboard');
+    if (!this.user) {
+      console.log('HabitideApp: Cannot render dashboard - no user');
+      return;
+    }
+
+    // Remove loading skeleton if it exists
+    const loadingSkeleton = document.querySelector('#dashboard .loading-skeleton');
+    if (loadingSkeleton) {
+      loadingSkeleton.remove();
+    }
+
     const section = document.getElementById('dashboard');
     if (!section) return;
     
@@ -1805,9 +1820,10 @@ class HabitideApp {
     const workoutContent = document.getElementById('workoutContent');
     if (!workoutContent) return;
 
-    // Get workout routine (custom or default)
+    // Get default routine and any custom exercises
+    const defaultRoutine = this.workoutRoutines[day];
     const customWorkout = this.data.customWorkouts && this.data.customWorkouts[day];
-    const routine = customWorkout || this.workoutRoutines[day];
+    const routine = defaultRoutine;
     
     if (!routine) {
       // No routine available
@@ -1851,6 +1867,17 @@ class HabitideApp {
         });
       }
     });
+    
+    // Add custom exercises to progress calculation
+    if (customWorkout && customWorkout.customExercises) {
+      customWorkout.customExercises.forEach((exercise, exerciseIndex) => {
+        const totalSets = exercise.sets || 1;
+        totalItems += totalSets;
+        
+        const exerciseState = this.data.workoutState[day][`custom_ex_${exerciseIndex}`] || {};
+        completedItems += Object.values(exerciseState).filter(completed => completed).length;
+      });
+    }
 
     const progressPercentage = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
 
@@ -1874,7 +1901,16 @@ class HabitideApp {
               <button class="btn btn--outline" onclick="app.showCustomWorkoutModal('${day}')">
                 ${customWorkout ? 'Edit Workout' : 'Customize'}
               </button>
-              ${completedItems > 0 ? `
+              ${progressPercentage === 100 ? `
+                <button class="btn btn--secondary" onclick="app.resetWorkoutDay('${day}')">
+                  Reset Progress
+                </button>
+              ` : `
+                <button class="btn btn--primary" onclick="app.markWorkoutDayComplete('${day}')">
+                  ✅ Mark Day Complete
+                </button>
+              `}
+              ${completedItems > 0 && progressPercentage < 100 ? `
                 <button class="btn btn--secondary" onclick="app.resetWorkoutDay('${day}')">
                   Reset Progress
                 </button>
@@ -1886,6 +1922,55 @@ class HabitideApp {
             ${routine.phases?.map((phase, phaseIndex) => {
               return this.renderWorkoutPhase(day, phase, phaseIndex);
             }).join('') || ''}
+            
+            ${customWorkout && customWorkout.customExercises && customWorkout.customExercises.length > 0 ? `
+              <div class="phase-card custom-exercises">
+                <div class="phase-header">
+                  <div class="phase-info">
+                    <h4 class="phase-name">
+                      ⭐ Custom Exercises
+                    </h4>
+                    <span class="phase-rest">Your additional exercises</span>
+                  </div>
+                </div>
+                <div class="phase-exercises">
+                  ${customWorkout.customExercises.map((exercise, exerciseIndex) => {
+                    const customPhaseKey = `custom_ex_${exerciseIndex}`;
+                    const exerciseState = this.data.workoutState[day][customPhaseKey] || {};
+                    const exerciseCompletedSets = Object.values(exerciseState).filter(completed => completed).length;
+                    const isExerciseComplete = exerciseCompletedSets === exercise.sets;
+                    
+                    return `
+                      <div class="exercise-card ${isExerciseComplete ? 'completed' : ''}">
+                        <div class="exercise-header">
+                          <div class="exercise-info">
+                            <h5 class="exercise-name">${exercise.name} <span style="color: var(--color-primary); font-size: 0.8em;">(Custom)</span></h5>
+                            <span class="exercise-sets-reps">${exercise.sets} sets × ${exercise.reps}</span>
+                            ${exercise.notes ? `<p class="exercise-notes">${exercise.notes}</p>` : ''}
+                          </div>
+                          <div class="exercise-status">
+                            ${isExerciseComplete ? '✅' : `${exerciseCompletedSets}/${exercise.sets}`}
+                          </div>
+                        </div>
+                        <div class="sets-tracker">
+                          ${Array.from({length: exercise.sets}, (_, setIndex) => {
+                            const isSetCompleted = exerciseState[setIndex] || false;
+                            return `
+                              <label class="set-label ${isSetCompleted ? 'completed' : ''}">
+                                <input type="checkbox" class="set-checkbox" 
+                                       ${isSetCompleted ? 'checked' : ''}
+                                       onchange="app.toggleSet('${day}', '${customPhaseKey}', ${setIndex}, this.checked)">
+                                Set ${setIndex + 1}
+                              </label>
+                            `;
+                          }).join('')}
+                        </div>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+            ` : ''}
           </div>
           
           ${progressPercentage === 100 ? `
@@ -2056,6 +2141,62 @@ class HabitideApp {
     this.renderWorkoutDay(day);
   }
 
+  markWorkoutDayComplete(day) {
+    if (confirm(`Mark the entire ${day} workout as complete? This will mark all exercises and sets as done.`)) {
+      // Get the default routine and custom workout
+      const defaultRoutine = this.workoutRoutines[day];
+      const customWorkout = this.data.customWorkouts && this.data.customWorkouts[day];
+      
+      if (!defaultRoutine || !defaultRoutine.phases) return;
+      
+      // Initialize workout state if needed
+      if (!this.data.workoutState) this.data.workoutState = {};
+      if (!this.data.workoutState[day]) this.data.workoutState[day] = {};
+      
+      // Mark all default phases as complete
+      defaultRoutine.phases.forEach((phase, phaseIndex) => {
+        const phaseKey = `phase_${phaseIndex}`;
+        
+        if (phase.type === 'warmup' || phase.type === 'cooldown' || phase.type === 'cardio' || phase.type === 'activity' || phase.type === 'recovery' || phase.type === 'hiit') {
+          // For time-based phases, just mark as completed
+          this.data.workoutState[day][phaseKey] = { completed: true };
+        } else {
+          // For set-based phases, mark all sets as complete
+          phase.exercises.forEach((exercise, exerciseIndex) => {
+            const exerciseKey = `${phaseKey}_ex_${exerciseIndex}`;
+            this.data.workoutState[day][exerciseKey] = {};
+            
+            // Mark all sets as complete
+            for (let setIndex = 0; setIndex < exercise.sets; setIndex++) {
+              this.data.workoutState[day][exerciseKey][setIndex] = true;
+            }
+          });
+        }
+      });
+      
+      // Mark all custom exercises as complete
+      if (customWorkout && customWorkout.customExercises) {
+        customWorkout.customExercises.forEach((exercise, exerciseIndex) => {
+          const exerciseKey = `custom_ex_${exerciseIndex}`;
+          this.data.workoutState[day][exerciseKey] = {};
+          
+          // Mark all sets as complete
+          for (let setIndex = 0; setIndex < exercise.sets; setIndex++) {
+            this.data.workoutState[day][exerciseKey][setIndex] = true;
+          }
+        });
+      }
+      
+      // Save to database
+      this.saveData();
+      
+      // Re-render the workout day
+      this.renderWorkoutDay(day);
+      
+      this.showNotification(`🎉 ${day} workout marked as complete!`, 'success');
+    }
+  }
+
   resetWorkoutDay(day) {
     if (confirm(`Reset all progress for ${day}? This cannot be undone.`)) {
       if (this.data.workoutState && this.data.workoutState[day]) {
@@ -2089,14 +2230,17 @@ class HabitideApp {
     this.data.workoutProgress = {};
     this.data.workoutState = {};
     
+    // Clear ALL custom workouts for the week
+    this.data.customWorkouts = {};
+    
     // Update last reset timestamp
     this.data.lastWeeklyReset = new Date().toISOString();
     
     // Save the changes
     this.saveData();
     
-    this.showNotification('🔄 Weekly reset completed! Fresh start for this week!', 'success');
-    console.log('Weekly reset performed on Sunday');
+    this.showNotification('🔄 Weekly reset completed! All workouts restored to defaults and progress cleared!', 'success');
+    console.log('Weekly reset performed - all custom workouts cleared');
   }
 
   resetAllWorkouts() {
@@ -2672,15 +2816,14 @@ class HabitideApp {
     let modal = document.querySelector('.custom-workout-modal');
     if (modal) modal.remove();
 
-    // Get ALL exercises - from custom workout if exists, otherwise from default routine
+    // Get ALL exercises - combine default routine with any custom additions
     const customWorkout = this.data.customWorkouts && this.data.customWorkouts[day];
     const defaultRoutine = this.workoutRoutines[day];
     
     let currentExercises = [];
-    if (customWorkout && customWorkout.exercises) {
-      currentExercises = customWorkout.exercises;
-    } else if (defaultRoutine && defaultRoutine.phases) {
-      // Extract exercises from all phases of default routine
+    
+    // First, add all exercises from the default routine
+    if (defaultRoutine && defaultRoutine.phases) {
       defaultRoutine.phases.forEach(phase => {
         if (phase.exercises) {
           phase.exercises.forEach(exercise => {
@@ -2689,39 +2832,51 @@ class HabitideApp {
                 name: exercise.name,
                 sets: exercise.sets,
                 reps: exercise.reps,
-                notes: exercise.notes || ''
+                notes: exercise.notes || '',
+                source: 'default'
               });
             }
           });
         }
       });
     }
+    
+    // Then, add any custom exercises (if they exist)
+    if (customWorkout && customWorkout.customExercises) {
+      customWorkout.customExercises.forEach(exercise => {
+        currentExercises.push({
+          name: exercise.name,
+          sets: exercise.sets,
+          reps: exercise.reps,
+          notes: exercise.notes || '',
+          source: 'custom'
+        });
+      });
+    }
 
     const exercisesHTML = currentExercises.map((ex, index) => `
-      <div class="exercise-item" data-index="${index}">
+      <div class="exercise-item" data-index="${index}" data-source="${ex.source || 'custom'}">
         <div class="exercise-inputs">
           <div class="input-group">
-            <label>Exercise Name</label>
-            <input type="text" class="exercise-input" value="${ex.name}" placeholder="e.g., Push-ups">
+            <label>Exercise Name ${ex.source === 'default' ? '(Default)' : '(Custom)'}</label>
+            <input type="text" class="exercise-input" value="${ex.name}" placeholder="e.g., Push-ups" ${ex.source === 'default' ? 'readonly' : ''}>
           </div>
           <div class="input-group">
             <label>Sets</label>
-            <input type="number" class="exercise-input" value="${ex.sets || ''}" placeholder="3" min="1">
+            <input type="number" class="exercise-input" value="${ex.sets || ''}" placeholder="3" min="1" ${ex.source === 'default' ? 'readonly' : ''}>
           </div>
           <div class="input-group">
             <label>Reps</label>
-            <input type="text" class="exercise-input" value="${ex.reps || ''}" placeholder="e.g., 10-12">
+            <input type="text" class="exercise-input" value="${ex.reps || ''}" placeholder="e.g., 10-12" ${ex.source === 'default' ? 'readonly' : ''}>
           </div>
         </div>
-        <button class="remove-exercise-btn" onclick="this.parentElement.remove()" title="Remove exercise">
-          <span>🗑️</span>
-        </button>
+        ${ex.source === 'default' ? '' : '<button class="remove-exercise-btn" onclick="this.parentElement.remove()" title="Remove custom exercise"><span>🗑️</span></button>'}
       </div>
     `).join('');
 
     document.body.insertAdjacentHTML('beforeend', `
       <div class="custom-workout-modal">
-        <div class="modal-backdrop" onclick="document.querySelector('.custom-workout-modal').remove()"></div>
+        <div class="modal-backdrop" onclick="if(event.target === this) document.querySelector('.custom-workout-modal').remove()"></div>
         <div class="custom-workout-modal-content">
           <div class="modal-header">
             <h3>Custom Workout for ${day}</h3>
@@ -2748,6 +2903,8 @@ class HabitideApp {
         </div>
       </div>
     `);
+    
+
   }
 
   addCustomExerciseField() {
@@ -2760,19 +2917,19 @@ class HabitideApp {
     }
     
     container.insertAdjacentHTML('beforeend', `
-      <div class="exercise-item">
+      <div class="exercise-item" data-source="custom">
         <div class="exercise-inputs">
           <div class="input-group">
-            <label>Exercise Name</label>
+            <label>Exercise Name (Custom)</label>
             <input type="text" class="exercise-input" placeholder="e.g., Push-ups">
           </div>
           <div class="input-group">
-            <label>Sets</label>
-            <input type="number" class="exercise-input" placeholder="3" min="1">
+            <label>Sets (optional)</label>
+            <input type="number" class="exercise-input" placeholder="3" min="0">
           </div>
           <div class="input-group">
-            <label>Reps</label>
-            <input type="text" class="exercise-input" placeholder="e.g., 10-12">
+            <label>Reps (optional)</label>
+            <input type="text" class="exercise-input" placeholder="e.g., 10-12, or time duration">
           </div>
         </div>
         <button class="remove-exercise-btn" onclick="this.parentElement.remove()" title="Remove exercise">
@@ -2784,45 +2941,60 @@ class HabitideApp {
 
   async saveCustomWorkout(day) {
     const container = document.getElementById('custom-exercises-container');
-    const exercises = [];
+    const customExercises = [];
+    
+    // Only save exercises that are marked as 'custom' (not default) OR don't have data-source attribute (new ones)
     container.querySelectorAll('.exercise-item').forEach(item => {
-      const inputs = item.querySelectorAll('.exercise-input');
-      const name = inputs[0].value.trim();
-      const sets = parseInt(inputs[1].value, 10);
-      const reps = inputs[2].value.trim();
-      if (name && sets > 0 && reps) {
-        exercises.push({ name, sets, reps, notes: 'Custom exercise' });
+      const dataSource = item.getAttribute('data-source');
+      if (dataSource === 'custom' || !dataSource) {
+        const inputs = item.querySelectorAll('.exercise-input');
+        const name = inputs[0].value.trim();
+        const sets = parseInt(inputs[1].value, 10) || 0; // Default to 0 if empty
+        const reps = inputs[2].value.trim() || 'As needed'; // Default text if empty
+        
+        if (name) { // Only name is required now
+          customExercises.push({ 
+            name, 
+            sets: sets || 0, 
+            reps: reps || 'As needed', 
+            notes: 'Custom exercise' 
+          });
+        }
       }
     });
 
-        if (exercises.length > 0) {
-      if (!this.data.customWorkouts) {
-        this.data.customWorkouts = {};
-      }
+    console.log('HabitideApp: Saving custom exercises for', day, 'with', customExercises.length, 'custom exercises');
+
+    if (!this.data.customWorkouts) {
+      this.data.customWorkouts = {};
+    }
+
+    if (customExercises.length > 0) {
+      // Store only the custom exercises, default exercises remain in workoutRoutines
       this.data.customWorkouts[day] = {
-        focus: "Custom Workout",
-        totalTime: "Variable",
-        exercises: exercises,
-        phases: [
-          {
-            type: "single",
-            name: "Custom Exercises",
-            exercises: exercises
-          }
-        ]
+        customExercises: customExercises,
+        hasCustom: true
       };
-      // The renderWorkoutDay function will automatically use customWorkouts over defaults
+      
+      console.log('HabitideApp: Custom exercises saved:', this.data.customWorkouts[day]);
       
       // Save to database
       await this.saveData();
-      this.showNotification('Custom workout saved!', 'success');
+      this.showNotification(`Added ${customExercises.length} custom exercise(s) to ${day}!`, 'success');
     } else {
-      delete this.data.customWorkouts[day];
-              // Don't modify this.workoutRoutines[day] as it contains the original defaults
+      // Check if there were previously custom exercises to determine the message
+      const hadCustom = this.data.customWorkouts && this.data.customWorkouts[day];
+      
+      if (hadCustom) {
+        // Remove custom workout if no custom exercises
+        delete this.data.customWorkouts[day];
         await this.saveData();
-      this.showNotification('Custom workout cleared.', 'info');
+        this.showNotification('All custom exercises removed.', 'info');
+      } else {
+        this.showNotification('No custom exercises to save. Please add at least one exercise.', 'warning');
+      }
     }
-    
+   
     document.querySelector('.custom-workout-modal').remove();
     this.renderWorkoutDay(day);
   }
@@ -4303,6 +4475,22 @@ class HabitideApp {
         authSection.querySelector(`#${targetTab}-form`).classList.add('active');
       });
     });
+    
+    // Add Enter key functionality for forms
+    const addEnterKeyListener = (formId, buttonCallback) => {
+      const form = authSection.querySelector(`#${formId}`);
+      if (form) {
+        form.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            buttonCallback();
+          }
+        });
+      }
+    };
+    
+    addEnterKeyListener('signin-form', () => this.signIn());
+    addEnterKeyListener('signup-form', () => this.signUp());
   }
 
   async signUp() {
@@ -4372,6 +4560,7 @@ class HabitideApp {
       
       this.user = { id: newUser.id, username: newUser.username };
       localStorage.setItem('habitide-user', JSON.stringify(this.user));
+      localStorage.setItem('habitide-session-timestamp', Date.now().toString());
       
       await this.ensureUserHasDefaultActionTypes();
       
@@ -4429,6 +4618,7 @@ class HabitideApp {
       
       this.user = { id: userData.id, username: userData.username };
       localStorage.setItem('habitide-user', JSON.stringify(this.user));
+      localStorage.setItem('habitide-session-timestamp', Date.now().toString());
       
       console.log('HabitideApp: USER SET TO:', this.user);
       
@@ -4451,6 +4641,8 @@ class HabitideApp {
     // Clear local data immediately
     this.user = null;
     localStorage.removeItem('habitide-user');
+    localStorage.removeItem('habitide-session-timestamp'); // Clear session timestamp
+    localStorage.removeItem('habitide-current-section'); // Clear navigation state
     
     // Sign out from Supabase silently (don't wait for it)
     supabase.auth.signOut().catch(error => {
