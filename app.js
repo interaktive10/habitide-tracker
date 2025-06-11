@@ -464,7 +464,8 @@ class HabitideApp {
         { id: 9, name: "Century Club", icon: "🏆", type: "actions", requirement: 100, description: "Complete 100 positive actions", earned: false },
         { id: 10, name: "Thousand Strong", icon: "🎖️", type: "actions", requirement: 1000, description: "Complete 1000 positive actions", earned: false }
       ],
-      lastFetched: null // Add lastFetched timestamp
+      lastFetched: null, // Add lastFetched timestamp
+      lastWeeklyReset: null // Track when last Sunday reset happened
     };
 
     // 7-day workout routines with supersets and time tracking
@@ -740,6 +741,9 @@ class HabitideApp {
         // User is authenticated - load data and initialize app
         await this.loadData();
         await this.loadActionTypes();
+        
+        // Check for automatic Sunday reset
+        this.checkWeeklyReset();
         // Apply theme immediately after loading settings but prioritize localStorage
         const savedTheme = localStorage.getItem('habitide-theme') || this.data.settings.theme;
         this.setTheme(savedTheme);
@@ -1235,8 +1239,8 @@ class HabitideApp {
     // Allow re-attachment for new DOM elements
     console.log('Attaching event listeners...');
     
-    // Navigation links
-    const navLinks = document.querySelectorAll('.nav-link[data-section]');
+    // Navigation links (both desktop and mobile)
+    const navLinks = document.querySelectorAll('.nav-link[data-section], .nav-mobile-link[data-section]');
     navLinks.forEach(link => {
       if (!link.dataset.listenerAttached) {
         link.addEventListener('click', (e) => {
@@ -1585,12 +1589,6 @@ class HabitideApp {
           <div class="dashboard-title">
             <h1>Dashboard</h1>
           </div>
-          <div class="dashboard-actions">
-            <button class="btn btn--primary add-action-modal-btn" id="openAddActionModal">
-              <span class="btn-icon">➕</span>
-              <span class="btn-text">Add Action</span>
-            </button>
-          </div>
         </div>
 
         <!-- Progress Overview -->
@@ -1627,17 +1625,20 @@ class HabitideApp {
                 <span id="progressDescription"></span>
               </div>
             </div>
+            <div class="dashboard-actions" style="margin-top: var(--space-24); text-align: center;">
+              <button class="btn btn--primary add-action-modal-btn" id="openAddActionModal">
+                <span class="btn-icon">➕</span>
+                <span class="btn-text">Add Action</span>
+              </button>
+            </div>
           </div>
         </div>
-
-
 
         <div class="dashboard-bottom">
           <!-- Quick Actions - Today -->
           <div class="card quick-actions-card">
             <div class="card__body">
               <h3>Quick Actions - Today</h3>
-              <p class="quick-actions-subtitle">One action per type per day</p>
               <div class="quick-actions-grid" id="quickActionsContainer">
                 <!-- Quick actions will be populated here -->
               </div>
@@ -1658,7 +1659,6 @@ class HabitideApp {
         <!-- Achievement Badges -->
         <div class="achievement-badges-section">
           <h2 class="badges-title">Achievement Badges</h2>
-          <p class="badges-subtitle">Unlock badges by completing goals and building habits</p>
           <div class="badges-grid badges-simple" id="badgesContainer">
             <!-- Badges will be populated here -->
           </div>
@@ -1717,17 +1717,20 @@ class HabitideApp {
     if (!section) return;
     section.innerHTML = `
       <div class="container">
-        <div class="section-header">
+        <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
           <h1>Workout Tracker</h1>
+          <button class="btn btn--outline" onclick="app.resetAllWorkouts()" title="Reset all workouts for the week">
+            Reset Week
+          </button>
         </div>
         <div class="workout-tabs">
-          <button class="workout-tab" data-day="Monday">Monday</button>
-          <button class="workout-tab" data-day="Tuesday">Tuesday</button>
-          <button class="workout-tab" data-day="Wednesday">Wednesday</button>
-          <button class="workout-tab" data-day="Thursday">Thursday</button>
-          <button class="workout-tab" data-day="Friday">Friday</button>
-          <button class="workout-tab" data-day="Saturday">Saturday</button>
-          <button class="workout-tab" data-day="Sunday">Sunday</button>
+          <button class="workout-tab" data-day="Monday">Mon</button>
+          <button class="workout-tab" data-day="Tuesday">Tue</button>
+          <button class="workout-tab" data-day="Wednesday">Wed</button>
+          <button class="workout-tab" data-day="Thursday">Thu</button>
+          <button class="workout-tab" data-day="Friday">Fri</button>
+          <button class="workout-tab" data-day="Saturday">Sat</button>
+          <button class="workout-tab" data-day="Sunday">Sun</button>
         </div>
         <div class="workout-content" id="workoutContent"></div>
       </div>
@@ -2021,6 +2024,46 @@ class HabitideApp {
       }
       this.saveData();
       this.renderWorkoutDay(day);
+    }
+  }
+
+  checkWeeklyReset() {
+    const now = new Date();
+    const isSunday = now.getDay() === 0; // Sunday is 0
+    const lastReset = this.data.lastWeeklyReset ? new Date(this.data.lastWeeklyReset) : null;
+    
+    // Check if it's Sunday and we haven't reset this week
+    if (isSunday && (!lastReset || this.getWeekStart(now) > this.getWeekStart(lastReset))) {
+      this.performWeeklyReset();
+    }
+  }
+
+  getWeekStart(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day; // Adjust to Sunday
+    return new Date(d.setDate(diff));
+  }
+
+  performWeeklyReset() {
+    // Reset all workout progress
+    this.data.workoutProgress = {};
+    this.data.workoutState = {};
+    
+    // Update last reset timestamp
+    this.data.lastWeeklyReset = new Date().toISOString();
+    
+    // Save the changes
+    this.saveData();
+    
+    this.showNotification('🔄 Weekly reset completed! Fresh start for this week!', 'success');
+    console.log('Weekly reset performed on Sunday');
+  }
+
+  resetAllWorkouts() {
+    if (confirm('Reset all workout progress for the entire week? This cannot be undone.')) {
+      this.performWeeklyReset();
+      this.renderWorkout(); // Re-render all workout days
     }
   }
 
@@ -2660,6 +2703,7 @@ class HabitideApp {
           </div>
           <div class="modal-footer">
             <button class="btn btn--outline" onclick="document.querySelector('.custom-workout-modal').remove()">Cancel</button>
+            ${customWorkout ? `<button class="btn btn--secondary" onclick="app.restoreDefaultWorkout('${day}')" style="margin-right: 8px;">Restore Default</button>` : ''}
             <button class="btn btn--primary" onclick="app.saveCustomWorkout('${day}')">Save Workout</button>
           </div>
         </div>
@@ -2742,6 +2786,80 @@ class HabitideApp {
     
     document.querySelector('.custom-workout-modal').remove();
     this.renderWorkoutDay(day);
+  }
+
+  restoreDefaultWorkout(day) {
+    if (confirm(`Restore the default workout for ${day}? This will replace your current custom workout.`)) {
+      // Remove custom workout for this day
+      if (this.data.customWorkouts && this.data.customWorkouts[day]) {
+        delete this.data.customWorkouts[day];
+      }
+      
+      // Clear workout state for this day to reset progress
+      if (this.data.workoutState && this.data.workoutState[day]) {
+        delete this.data.workoutState[day];
+      }
+      
+      // Save changes
+      this.saveData();
+      
+      // Close modal and refresh workout display
+      document.querySelector('.custom-workout-modal').remove();
+      this.renderWorkoutDay(day);
+      
+      this.showNotification(`${day} workout restored to default!`, 'success');
+    }
+  }
+
+  // Method to specifically restore Wednesday supersets
+  restoreWednesdayDefault() {
+    if (confirm('Restore Wednesday to the default superset workout? This will clear any custom workout and progress.')) {
+      // Remove custom workout for Wednesday
+      if (this.data.customWorkouts && this.data.customWorkouts['Wednesday']) {
+        delete this.data.customWorkouts['Wednesday'];
+      }
+      
+      // Clear workout state for Wednesday to reset progress
+      if (this.data.workoutState && this.data.workoutState['Wednesday']) {
+        delete this.data.workoutState['Wednesday'];
+      }
+      
+      // Save changes
+      this.saveData();
+      
+      // Refresh workout display
+      this.renderWorkoutDay('Wednesday');
+      
+      this.showNotification('Wednesday workout restored to default supersets!', 'success');
+      console.log('Wednesday default workout restored:', this.workoutRoutines['Wednesday']);
+    }
+  }
+
+  // Debug method to check Wednesday workout status
+  checkWednesdayWorkout() {
+    console.log('=== Wednesday Workout Status ===');
+    console.log('Default workout exists:', !!this.workoutRoutines['Wednesday']);
+    console.log('Default workout:', this.workoutRoutines['Wednesday']);
+    console.log('Custom workout exists:', !!(this.data.customWorkouts && this.data.customWorkouts['Wednesday']));
+    console.log('Custom workout:', this.data.customWorkouts && this.data.customWorkouts['Wednesday']);
+    console.log('Workout state:', this.data.workoutState && this.data.workoutState['Wednesday']);
+    
+    const customWorkout = this.data.customWorkouts && this.data.customWorkouts['Wednesday'];
+    const routine = customWorkout || this.workoutRoutines['Wednesday'];
+    console.log('Current active workout:', routine);
+    
+    if (this.workoutRoutines['Wednesday']) {
+      const supersetCount = this.workoutRoutines['Wednesday'].phases.filter(phase => phase.type === 'superset').length;
+      console.log('Default workout superset count:', supersetCount);
+    }
+    
+    return {
+      hasDefault: !!this.workoutRoutines['Wednesday'],
+      hasCustom: !!(this.data.customWorkouts && this.data.customWorkouts['Wednesday']),
+      activeWorkout: routine,
+      supersetCount: this.workoutRoutines['Wednesday'] ? 
+        this.workoutRoutines['Wednesday'].phases.filter(phase => phase.type === 'superset').length : 0
+    };
   }
 
   async addCalendarAction() {
@@ -3232,6 +3350,9 @@ class HabitideApp {
     const currentLevelDisplay = document.getElementById('currentLevelDisplay');
     const totalEarned = document.getElementById('totalEarned');
     const totalLost = document.getElementById('totalLost');
+    const progressFill = document.getElementById('progressFill');
+    const progressPercentage = document.getElementById('progressPercentage');
+    const progressDescription = document.getElementById('progressDescription');
 
     
     if (targetGoalDisplay) targetGoalDisplay.textContent = format(settings.targetGoal || 0);
@@ -3239,6 +3360,29 @@ class HabitideApp {
     if (totalEarned) totalEarned.textContent = format(stats.totalEarned || 0);
     if (totalLost) totalLost.textContent = format(stats.totalLost || 0);
 
+    // Update progress bar
+    const targetGoal = settings.targetGoal || 0;
+    const currentDebt = stats.currentDebt || 0;
+    let progressPercent = 0;
+    let description = '';
+
+    if (targetGoal > 0) {
+      const debtReduced = targetGoal - currentDebt;
+      progressPercent = Math.max(0, Math.min(100, (debtReduced / targetGoal) * 100));
+      
+      if (currentDebt <= 0) {
+        description = '🎉 Goal achieved! You\'ve eliminated your debt!';
+      } else {
+        const remaining = format(currentDebt);
+        description = `${remaining} remaining to reach your goal`;
+      }
+    } else {
+      description = 'Set a target goal in Profile to track progress';
+    }
+
+    if (progressFill) progressFill.style.width = `${progressPercent}%`;
+    if (progressPercentage) progressPercentage.textContent = `${Math.round(progressPercent)}%`;
+    if (progressDescription) progressDescription.textContent = description;
   }
 
   findActionType(typeId) {
@@ -3547,21 +3691,22 @@ class HabitideApp {
       console.log('Initializing default badges...');
       this.data.badges = [
         // Milestone badges
-        { id: 1, name: "First Step", icon: "🎯", type: "milestone", requirement: 1, description: "Complete your first action", earned: false },
+        { id: 1, name: "First Step", icon: "🎯", type: "milestone", requirement: 1, description: "Complete your first action", earned: false, color: "#10B981" },
         
         // Streak badges
-        { id: 2, name: "Week Warrior", icon: "🔥", type: "streak", requirement: 7, description: "7-day streak", earned: false },
-        { id: 3, name: "Month Master", icon: "💎", type: "streak", requirement: 30, description: "30-day streak", earned: false },
-        { id: 4, name: "Hundred Hero", icon: "👑", type: "streak", requirement: 100, description: "100-day streak", earned: false },
+        { id: 2, name: "Week Warrior", icon: "🔥", type: "streak", requirement: 7, description: "7-day streak", earned: false, color: "#F59E0B" },
+        { id: 3, name: "Month Master", icon: "💎", type: "streak", requirement: 30, description: "30-day streak", earned: false, color: "#3B82F6" },
+        { id: 4, name: "Hundred Hero", icon: "👑", type: "streak", requirement: 100, description: "100-day streak", earned: false, color: "#8B5CF6" },
         
         // Savings badges (debt reduction)
-        { id: 5, name: "Quarter Crusher", icon: "⭐", type: "savings", requirement: 0.25, description: "Reduce debt by 25%", earned: false },
-        { id: 6, name: "Half Hero", icon: "🌟", type: "savings", requirement: 0.5, description: "Reduce debt by 50%", earned: false },
-        { id: 7, name: "Debt Destroyer", icon: "💰", type: "savings", requirement: 1.0, description: "Eliminate all debt", earned: false },
+        { id: 5, name: "Quarter Crusher", icon: "⭐", type: "savings", requirement: 0.25, description: "Reduce debt by 25%", earned: false, color: "#06B6D4" },
+        { id: 6, name: "Half Hero", icon: "🌟", type: "savings", requirement: 0.5, description: "Reduce debt by 50%", earned: false, color: "#84CC16" },
+        { id: 7, name: "Debt Destroyer", icon: "💰", type: "savings", requirement: 1.0, description: "Eliminate all debt", earned: false, color: "#F97316" },
         
         // Action count badges
-        { id: 8, name: "Action Hero", icon: "💪", type: "actions", requirement: 50, description: "Complete 50 positive actions", earned: false },
-        { id: 9, name: "Century Club", icon: "🏆", type: "actions", requirement: 100, description: "Complete 100 positive actions", earned: false }
+        { id: 8, name: "Action Hero", icon: "💪", type: "actions", requirement: 50, description: "Complete 50 positive actions", earned: false, color: "#EF4444" },
+        { id: 9, name: "Century Club", icon: "🏆", type: "actions", requirement: 100, description: "Complete 100 positive actions", earned: false, color: "#EC4899" },
+        { id: 10, name: "Thousand Strong", icon: "🎖️", type: "actions", requirement: 1000, description: "Complete 1000 positive actions", earned: false, color: "#6366F1" }
       ];
     }
     
@@ -3579,36 +3724,71 @@ class HabitideApp {
       const progress = this.getBadgeProgress(badge);
       const percentage = Math.min((progress / badge.requirement) * 100, 100);
       const isEarned = badge.earned || progress >= badge.requirement;
+      const isInProgress = progress > 0 && !isEarned;
+      const badgeColor = badge.color || '#6B7280';
       
       if (isProfileSection) {
-        // Detailed view for profile section
+        // Detailed view for profile section - enhanced design
         html += `
-          <div class="badge-progress-item ${isEarned ? 'earned' : ''}">
-            <div class="badge-progress-info">
-              <div class="badge-progress-icon ${isEarned ? 'earned' : ''}">${badge.icon}</div>
-              <div class="badge-progress-details">
-                <div class="badge-progress-name">${badge.name}</div>
-                <div class="badge-progress-description">${badge.description}</div>
+          <div class="badge-progress-item ${isEarned ? 'earned' : isInProgress ? 'in-progress' : 'locked'}" 
+               style="--badge-color: ${badgeColor}">
+            <div class="badge-progress-main">
+              <div class="badge-progress-icon-container">
+                <div class="badge-progress-icon ${isEarned ? 'earned' : isInProgress ? 'in-progress' : 'locked'}">
+                  <span class="badge-icon-emoji">${badge.icon}</span>
+                  ${isEarned ? '<div class="badge-earned-overlay">✨</div>' : ''}
+                </div>
+                <div class="badge-progress-ring">
+                  <svg width="60" height="60" class="progress-ring">
+                    <circle cx="30" cy="30" r="25" stroke="var(--color-border)" stroke-width="3" fill="none" />
+                    <circle cx="30" cy="30" r="25" stroke="${badgeColor}" stroke-width="3" fill="none"
+                            stroke-dasharray="${2 * Math.PI * 25}" 
+                            stroke-dashoffset="${2 * Math.PI * 25 * (1 - percentage / 100)}"
+                            class="progress-circle ${isEarned ? 'completed' : ''}" />
+                  </svg>
+                </div>
               </div>
-            </div>
-            <div class="badge-progress-status">
-              <div class="badge-progress-text ${isEarned ? 'earned' : ''}">${this.formatBadgeProgress(badge, progress)}</div>
-              <div class="badge-progress-bar-container">
-                <div class="badge-progress-bar-fill" style="width: ${percentage}%"></div>
+              <div class="badge-progress-details">
+                <div class="badge-progress-header">
+                  <h4 class="badge-progress-name">${badge.name}</h4>
+                  ${isEarned ? '<span class="badge-earned-status">✅ Earned!</span>' : ''}
+                </div>
+                <p class="badge-progress-description">${badge.description}</p>
+                <div class="badge-progress-stats">
+                  <span class="badge-progress-text">${this.formatBadgeProgressEnhanced(badge, progress)}</span>
+                  <span class="badge-progress-percentage">${Math.round(percentage)}%</span>
+                </div>
+                <div class="badge-progress-bar">
+                  <div class="badge-progress-bar-fill" style="width: ${percentage}%; background-color: ${badgeColor}"></div>
+                </div>
               </div>
             </div>
           </div>
         `;
       } else {
-        // Compact view for dashboard - direct badge items for grid layout
+        // Compact view for dashboard - enhanced grid design
         html += `
-          <div class="badge-item ${isEarned ? 'earned' : ''}">
-            <div class="badge-circle ${isEarned ? 'earned' : (progress > 0 ? 'in-progress' : 'locked')}">
-              <div class="badge-icon">${badge.icon}</div>
+          <div class="badge-item ${isEarned ? 'earned' : isInProgress ? 'in-progress' : 'locked'}" 
+               style="--badge-color: ${badgeColor}"
+               title="${badge.description}">
+            <div class="badge-circle-container">
+              <div class="badge-circle ${isEarned ? 'earned' : isInProgress ? 'in-progress' : 'locked'}">
+                <div class="badge-icon">${badge.icon}</div>
+                ${isEarned ? '<div class="badge-earned-glow"></div>' : ''}
+              </div>
+              <div class="badge-progress-ring-small">
+                <svg width="50" height="50" class="progress-ring-small">
+                  <circle cx="25" cy="25" r="20" stroke="var(--color-border)" stroke-width="2" fill="none" />
+                  <circle cx="25" cy="25" r="20" stroke="${badgeColor}" stroke-width="2" fill="none"
+                          stroke-dasharray="${2 * Math.PI * 20}" 
+                          stroke-dashoffset="${2 * Math.PI * 20 * (1 - percentage / 100)}"
+                          class="progress-circle-small ${isEarned ? 'completed' : ''}" />
+                </svg>
+              </div>
             </div>
             <div class="badge-info">
               <div class="badge-name">${badge.name}</div>
-              <div class="badge-progress-text">${this.formatBadgeProgress(badge, progress)}</div>
+              <div class="badge-progress-text">${this.formatBadgeProgressCompact(badge, progress)}</div>
             </div>
           </div>
         `;
@@ -3679,21 +3859,63 @@ class HabitideApp {
     }
   }
 
-  // Helper method to format badge progress text
+  // Helper method to format badge progress text (legacy - keeping for compatibility)
   formatBadgeProgress(badge, progress) {
+    return this.formatBadgeProgressCompact(badge, progress);
+  }
+
+  // Enhanced progress formatting for detailed view
+  formatBadgeProgressEnhanced(badge, progress) {
     switch (badge.type) {
       case 'milestone':
-        return progress >= badge.requirement ? 'Complete!' : 'Not started';
+        return progress >= badge.requirement ? '🎉 Milestone achieved!' : 'Complete your first action to unlock';
+        
+      case 'streak':
+        if (progress >= badge.requirement) {
+          return `🔥 ${Math.floor(progress)} day streak achieved!`;
+        } else if (progress > 0) {
+          return `Current streak: ${Math.floor(progress)} days (${badge.requirement - Math.floor(progress)} more to go)`;
+        } else {
+          return `Start a ${badge.requirement}-day streak`;
+        }
+        
+      case 'savings':
+        const currentPercentage = Math.min((progress / badge.requirement) * 100, 100);
+        const targetPercentage = badge.requirement * 100;
+        if (currentPercentage >= targetPercentage) {
+          return `💰 ${targetPercentage}% debt reduction achieved!`;
+        } else {
+          return `${currentPercentage.toFixed(1)}% debt reduced (targeting ${targetPercentage}%)`;
+        }
+        
+      case 'actions':
+        if (progress >= badge.requirement) {
+          return `💪 ${Math.floor(progress)} positive actions completed!`;
+        } else {
+          return `${Math.floor(progress)} of ${badge.requirement} positive actions completed`;
+        }
+        
+      default:
+        return `${Math.floor(progress)} of ${badge.requirement} completed`;
+    }
+  }
+
+  // Compact progress formatting for grid view
+  formatBadgeProgressCompact(badge, progress) {
+    switch (badge.type) {
+      case 'milestone':
+        return progress >= badge.requirement ? 'Complete!' : '0/1';
         
       case 'streak':
         return `${Math.floor(progress)}/${badge.requirement} days`;
         
       case 'savings':
         const percentage = Math.min((progress / badge.requirement) * 100, 100);
-        return `${percentage.toFixed(1)}% / ${(badge.requirement * 100).toFixed(0)}%`;
+        const target = badge.requirement * 100;
+        return `${percentage.toFixed(0)}%/${target}%`;
         
       case 'actions':
-        return `${Math.floor(progress)}/${badge.requirement} actions`;
+        return `${Math.floor(progress)}/${badge.requirement}`;
         
       default:
         return `${Math.floor(progress)}/${badge.requirement}`;

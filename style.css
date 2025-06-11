@@ -546,6 +546,11 @@ a:hover {
   transition: opacity var(--duration-fast);
 }
 
+/* Dark mode button gradient */
+[data-color-scheme="dark"] .btn--primary::before {
+  background: linear-gradient(rgba(100, 116, 139, 0.3), rgba(71, 85, 105, 0.1));
+}
+
 .btn--primary:hover::before {
   opacity: 1;
 }
@@ -636,6 +641,11 @@ a:hover {
 
 .btn--primary .btn-ripple {
   background: rgba(255, 255, 255, 0.5);
+}
+
+/* Dark mode ripple */
+[data-color-scheme="dark"] .btn--primary .btn-ripple {
+  background: rgba(100, 116, 139, 0.6);
 }
 
 .btn--secondary .btn-ripple {
@@ -754,7 +764,7 @@ select.form-control {
 
 @media (max-width: 768px) {
   .main-content {
-    margin-top: 60px;
+    margin-top: 0; /* No margin since we have sticky mobile header */
     padding: var(--space-20);
     padding-bottom: 80px; /* Space for mobile nav */
   }
@@ -849,7 +859,7 @@ select.form-control {
 
 @media (max-width: 768px) {
   .nav-top {
-    height: 60px;
+    display: none; /* Hide top navigation on mobile */
   }
   
   .nav-container {
@@ -950,6 +960,35 @@ select.form-control {
 @media (min-width: 769px) {
   .nav-mobile {
     display: none;
+  }
+}
+
+/* Mobile Header */
+.mobile-header {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--space-16) var(--space-20);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  
+  .mobile-logo {
+    margin: 0;
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-primary);
+    text-align: center;
   }
 }
 
@@ -1413,6 +1452,30 @@ select.form-control {
   border-bottom: 1px solid var(--color-border);
   overflow-x: auto;
   padding-bottom: var(--space-16);
+  flex-wrap: nowrap; /* Force single line layout */
+}
+
+@media (max-width: 768px) {
+  .workout-tabs {
+    justify-content: flex-start; /* Align tabs to start on mobile */
+    gap: var(--space-4);
+    flex-wrap: nowrap; /* Force single line */
+    overflow-x: auto; /* Enable horizontal scroll if needed */
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on mobile */
+    scrollbar-width: none; /* Hide scrollbar for Firefox */
+    -ms-overflow-style: none; /* Hide scrollbar for IE/Edge */
+  }
+  
+  .workout-tabs::-webkit-scrollbar {
+    display: none; /* Hide scrollbar for WebKit browsers */
+  }
+  
+  .workout-tab {
+    padding: var(--space-8) var(--space-12); /* Smaller padding on mobile */
+    font-size: var(--font-size-sm); /* Smaller font size */
+    min-width: auto; /* Allow tabs to be smaller */
+    flex-shrink: 0; /* Prevent tabs from shrinking */
+  }
 }
 
 .workout-tab {
@@ -2626,6 +2689,22 @@ select.form-control {
   .calendar-container {
     grid-template-columns: 1fr;
     gap: var(--space-16);
+    margin: 0 calc(-1 * var(--space-16)); /* Extend to full container width */
+    padding: 0; /* Remove padding for full width */
+  }
+  
+  .calendar-main {
+    margin: 0; /* Remove any default margins */
+    border-radius: 0; /* Remove border radius on mobile for full width */
+    border-left: none; /* Remove left border */
+    border-right: none; /* Remove right border */
+  }
+  
+  /* Fix calendar section container on mobile */
+  #calendar .container {
+    padding-left: 0;
+    padding-right: 0;
+    max-width: 100%;
   }
   
   .calendar-day {
@@ -3278,6 +3357,11 @@ select.form-control {
   bottom: 0;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
   animation: shimmer 2s infinite;
+}
+
+/* Dark mode shimmer */
+[data-color-scheme="dark"] .progress-fill::after {
+  background: linear-gradient(90deg, transparent, rgba(100, 116, 139, 0.4), transparent);
 }
 
 @keyframes shimmer {
@@ -4195,6 +4279,11 @@ html[data-color-scheme="dark"] *,
   overflow: hidden;
 }
 
+/* Dark mode stat card gradient */
+[data-color-scheme="dark"] .stat-card {
+  background: linear-gradient(135deg, var(--color-surface), rgba(71, 85, 105, 0.6));
+}
+
 .stat-card::before {
   content: '';
   position: absolute;
@@ -4748,16 +4837,16 @@ html[data-color-scheme="dark"] *,
   
   .activity-card {
     padding: var(--space-12);
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
     gap: var(--space-12);
   }
   
-      .activity-value {
-      align-self: flex-end;
-      min-width: 70px;
-      font-size: var(--font-size-base);
-    }
+  .activity-value {
+    min-width: 70px;
+    font-size: var(--font-size-base);
+  }
   }
   
   /* Extra small screens - Single column stats */
@@ -4936,4 +5025,520 @@ html[data-color-scheme="dark"] *,
   .add-action-modal-btn .btn-text {
     font-size: var(--font-size-sm);
   }
+}
+
+/* === Enhanced Badge System Styles === */
+
+/* Enhanced Badge Grid Styles */
+.badges-grid .badge-item {
+  --badge-color: #6B7280;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-16);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  border: 2px solid transparent;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.badges-grid .badge-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 0%, var(--badge-color, #6B7280)20%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 0;
+}
+
+.badges-grid .badge-item:hover::before {
+  opacity: 0.05;
+}
+
+.badges-grid .badge-item.earned::before {
+  opacity: 0.1;
+}
+
+.badges-grid .badge-item > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Badge Circle Container */
+.badge-circle-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.badge-circle {
+  position: relative;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 2;
+}
+
+.badge-circle.locked {
+  background: var(--color-background);
+  border: 2px solid var(--color-border);
+  color: var(--color-text-secondary);
+  opacity: 0.6;
+}
+
+.badge-circle.in-progress {
+  background: linear-gradient(135deg, var(--badge-color)10%, var(--badge-color)30%);
+  border: 2px solid var(--badge-color);
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.badge-circle.earned {
+  background: linear-gradient(135deg, var(--badge-color), var(--badge-color)90%);
+  border: 2px solid var(--badge-color);
+  color: white;
+  box-shadow: 
+    0 4px 20px var(--badge-color)40%,
+    0 0 0 4px var(--badge-color)20%;
+  animation: badge-glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes badge-glow {
+  0% { box-shadow: 0 4px 20px var(--badge-color)40%, 0 0 0 4px var(--badge-color)20%; }
+  100% { box-shadow: 0 6px 25px var(--badge-color)60%, 0 0 0 6px var(--badge-color)30%; }
+}
+
+.badge-earned-glow {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--badge-color)20% 0%, transparent 70%);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.1); }
+}
+
+/* Progress Ring Styles */
+.badge-progress-ring-small {
+  position: absolute;
+  inset: -2px;
+  pointer-events: none;
+}
+
+.progress-ring-small {
+  transform: rotate(-90deg);
+}
+
+.progress-circle-small {
+  transition: stroke-dashoffset 0.5s ease-in-out;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.progress-circle-small.completed {
+  animation: progress-complete 0.6s ease-in-out;
+}
+
+@keyframes progress-complete {
+  0% { stroke-dashoffset: calc(2 * 3.14159 * 20); }
+  100% { stroke-dashoffset: 0; }
+}
+
+/* Badge Info Styles */
+.badge-info {
+  text-align: center;
+  min-height: 50px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-4);
+}
+
+.badge-name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.badge-progress-text {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Enhanced states */
+.badge-item.earned .badge-name {
+  color: var(--badge-color);
+  font-weight: var(--font-weight-bold);
+}
+
+.badge-item.earned .badge-progress-text {
+  color: var(--badge-color);
+}
+
+.badge-item.in-progress .badge-name {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Hover Effects */
+.badge-item:hover {
+  transform: translateY(-2px);
+  border-color: var(--badge-color)30%;
+  box-shadow: 
+    0 8px 25px rgba(0, 0, 0, 0.1),
+    0 0 0 1px var(--badge-color)20%;
+}
+
+.badge-item:hover .badge-circle.locked {
+  transform: scale(1.05);
+  border-color: var(--color-border-hover);
+}
+
+.badge-item:hover .badge-circle.in-progress {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.badge-item:hover .badge-circle.earned {
+  transform: scale(1.05) rotate(5deg);
+}
+
+/* === Enhanced Profile Badge Styles === */
+
+.badge-progress-item {
+  --badge-color: #6B7280;
+  display: flex;
+  gap: var(--space-20);
+  padding: var(--space-24);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  border: 2px solid transparent;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.badge-progress-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--badge-color);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.badge-progress-item.earned::before {
+  opacity: 1;
+}
+
+.badge-progress-item.in-progress::before {
+  opacity: 0.6;
+}
+
+.badge-progress-item:hover {
+  border-color: var(--badge-color)30%;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+}
+
+.badge-progress-item:hover::before {
+  opacity: 0.8;
+}
+
+/* Icon Container */
+.badge-progress-icon-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.badge-progress-icon {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.75rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 2;
+}
+
+.badge-progress-icon.locked {
+  background: var(--color-background);
+  border: 3px solid var(--color-border);
+  color: var(--color-text-secondary);
+  opacity: 0.7;
+}
+
+.badge-progress-icon.in-progress {
+  background: linear-gradient(135deg, var(--badge-color)20%, var(--badge-color)60%);
+  border: 3px solid var(--badge-color);
+  color: white;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.badge-progress-icon.earned {
+  background: linear-gradient(135deg, var(--badge-color), var(--badge-color)80%);
+  border: 3px solid var(--badge-color);
+  color: white;
+  box-shadow: 
+    0 6px 25px var(--badge-color)50%,
+    0 0 0 4px var(--badge-color)25%;
+}
+
+.badge-icon-emoji {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+.badge-earned-overlay {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  font-size: 1.2rem;
+  animation: sparkle 1.5s ease-in-out infinite;
+}
+
+@keyframes sparkle {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.8; }
+  50% { transform: scale(1.2) rotate(180deg); opacity: 1; }
+}
+
+/* Progress Ring for Detailed View */
+.badge-progress-ring {
+  position: absolute;
+  inset: -3px;
+  pointer-events: none;
+}
+
+.progress-ring {
+  transform: rotate(-90deg);
+}
+
+.progress-circle {
+  transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+}
+
+/* Badge Details */
+.badge-progress-main {
+  display: flex;
+  gap: var(--space-20);
+  align-items: flex-start;
+  width: 100%;
+}
+
+.badge-progress-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.badge-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-8);
+}
+
+.badge-progress-name {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.badge-earned-status {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--badge-color);
+  padding: var(--space-4) var(--space-8);
+  background: var(--badge-color)15%;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--badge-color)30%;
+}
+
+.badge-progress-description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-16) 0;
+  line-height: 1.5;
+}
+
+.badge-progress-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-12);
+}
+
+.badge-progress-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.badge-progress-percentage {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--badge-color);
+}
+
+/* Enhanced Progress Bar */
+.badge-progress-bar {
+  height: 8px;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  position: relative;
+}
+
+.badge-progress-bar-fill {
+  height: 100%;
+  background: var(--badge-color);
+  border-radius: var(--radius-full);
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.badge-progress-bar-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  animation: shimmer-progress 2s infinite;
+}
+
+@keyframes shimmer-progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+/* Enhanced States */
+.badge-progress-item.earned {
+  background: linear-gradient(135deg, var(--color-surface) 0%, var(--badge-color)05% 100%);
+  border-color: var(--badge-color)30%;
+}
+
+.badge-progress-item.earned .badge-progress-name {
+  color: var(--badge-color);
+}
+
+.badge-progress-item.earned .badge-progress-text {
+  color: var(--badge-color);
+  font-weight: var(--font-weight-semibold);
+}
+
+.badge-progress-item.in-progress {
+  background: linear-gradient(135deg, var(--color-surface) 0%, var(--badge-color)03% 100%);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .badge-progress-item {
+    gap: var(--space-16);
+    padding: var(--space-20);
+  }
+  
+  .badge-progress-main {
+    gap: var(--space-16);
+  }
+  
+  .badge-progress-icon-container {
+    flex-shrink: 0;
+  }
+  
+  .badge-progress-icon {
+    width: 50px;
+    height: 50px;
+    font-size: 1.5rem;
+  }
+  
+  .badge-progress-ring {
+    inset: -2px;
+  }
+  
+  .badge-progress-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-8);
+  }
+  
+  .badge-progress-stats {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+  
+  .badges-grid .badge-item {
+    padding: var(--space-14);
+    gap: var(--space-10);
+  }
+  
+  .badge-circle {
+    width: 45px;
+    height: 45px;
+    font-size: 1.25rem;
+  }
+  
+  .badge-name {
+    font-size: var(--font-size-xs);
+  }
+  
+  .badge-progress-text {
+    font-size: 10px;
+  }
+}
+
+/* Success Animation */
+@keyframes badge-success {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.badge-item.earned,
+.badge-progress-item.earned {
+  animation: badge-success 0.6s ease-out;
+}
+
+/* Add some enhanced button styles for consistency */
+.btn--success {
+  background: linear-gradient(135deg, #10B981, #059669);
+  color: white;
+  border: none;
+  font-weight: var(--font-weight-semibold);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn--success:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+  transform: translateY(-1px);
 }

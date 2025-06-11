@@ -46,6 +46,11 @@
             </div>
         </nav>
 
+        <!-- Mobile Header (visible only on mobile) -->
+        <header class="mobile-header">
+            <h1 class="mobile-logo">Habitide</h1>
+        </header>
+
         <!-- Main Content -->
         <main class="main-content">
             <!-- Dashboard Section -->
@@ -63,7 +68,6 @@
                 <div class="container">
                     <div class="section-header">
                         <h1>Workout Tracker</h1>
-                        <p>5-day Monday-Friday routine + custom workouts for all days</p>
                     </div>
 
                     <div class="workout-tabs">
@@ -87,7 +91,6 @@
                 <div class="container" id="calendarContainer">
                     <div class="section-header">
                         <h1>Calendar View</h1>
-                        <p>View and manage your daily actions</p>
                     </div>
 
                     <div class="calendar-container">
@@ -126,7 +129,6 @@
                 <div class="container" id="profileContainer">
                     <div class="section-header">
                         <h1>Profile Settings</h1>
-                        <p>Customize your goals and action types</p>
                     </div>
 
                     <div class="profile-grid">
@@ -162,9 +164,7 @@
                         <div class="card">
                             <div class="card__body">
                                 <h3>Quick Actions</h3>
-                                <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-16);">
-                                    Select which actions appear in the dashboard quick actions section
-                                </p>
+
                                 <div id="quickActionsSelection">
                                     <!-- Will be populated by JavaScript -->
                                 </div>
