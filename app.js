@@ -753,10 +753,14 @@ class HabitideApp {
         this.ensureMainSectionsExist();
         // Reset render flags for fresh start
         this.resetRenderFlags();
+        // Hide auth UI and show main app
+        this.hideAuthUI();
         // Initial render (only after data and sections are ready)
         await this.renderAll();
         // Setup event listeners
         this.reAttachEventListeners();
+        // Navigate to dashboard as default
+        await this.navigateToSection('dashboard');
         // Setup notifications
         await this.requestNotificationPermission();
         // Setup daily reminder
@@ -1167,8 +1171,8 @@ class HabitideApp {
     const sections = document.querySelectorAll('.section');
     sections.forEach(section => section.classList.remove('active'));
     
-    // Remove active class from all nav links
-    const navLinks = document.querySelectorAll('.nav-link');
+    // Remove active class from all nav links (both desktop and mobile)
+    const navLinks = document.querySelectorAll('.nav-link, .nav-mobile-link');
     navLinks.forEach(link => link.classList.remove('active'));
     
     // Add active class to target section
@@ -1177,8 +1181,8 @@ class HabitideApp {
       targetSection.classList.add('active');
     }
     
-    // Add active class to corresponding nav link
-    const activeNavLink = document.querySelector(`.nav-link[data-section="${sectionName}"]`);
+    // Add active class to corresponding nav link (both desktop and mobile)
+    const activeNavLink = document.querySelector(`.nav-link[data-section="${sectionName}"], .nav-mobile-link[data-section="${sectionName}"]`);
     if (activeNavLink) {
       activeNavLink.classList.add('active');
     }
@@ -4096,6 +4100,21 @@ class HabitideApp {
   }
 
   // Authentication and UI methods
+  hideAuthUI() {
+    // Hide auth UI and show main sections
+    const authSection = document.getElementById('auth');
+    if (authSection) {
+      authSection.style.display = 'none';
+    }
+    
+    // Show main app sections
+    const sections = ['dashboard', 'workout', 'calendar', 'profile'];
+    sections.forEach(sectionId => {
+      const section = document.getElementById(sectionId);
+      if (section) section.style.display = 'block';
+    });
+  }
+
   showAuthUI() {
     const sections = ['dashboard', 'workout', 'calendar', 'profile'];
     sections.forEach(sectionId => {
