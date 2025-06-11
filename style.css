@@ -17,6 +17,83 @@
   100% { background-position: -200% 0; }
 }
 
+/* Auth UI Styles */
+.auth-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--space-24);
+  background: linear-gradient(135deg, var(--color-background) 0%, rgba(139, 92, 246, 0.03) 100%);
+}
+
+.auth-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-32);
+  width: 100%;
+  max-width: 400px;
+}
+
+.auth-card h1 {
+  text-align: center;
+  margin-bottom: var(--space-16);
+  color: var(--color-primary);
+}
+
+.auth-card p {
+  text-align: center;
+  margin-bottom: var(--space-32);
+  color: var(--color-text-secondary);
+}
+
+.auth-tabs {
+  display: flex;
+  border-radius: var(--radius-base);
+  background: var(--color-secondary);
+  padding: var(--space-4);
+  margin-bottom: var(--space-24);
+}
+
+.auth-tab {
+  flex: 1;
+  padding: var(--space-12) var(--space-16);
+  border: none;
+  background: none;
+  border-radius: var(--radius-base);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.auth-tab.active {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+}
+
+.auth-form {
+  display: none;
+}
+
+.auth-form.active {
+  display: block;
+}
+
+.auth-error {
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+  margin-top: var(--space-8);
+  text-align: center;
+}
+
+.btn--full-width {
+  width: 100%;
+}
+
 :root {
   /* Colors - Updated to purple/violet theme */
   --color-background: rgba(248, 250, 252, 1);
@@ -938,6 +1015,35 @@ select.form-control {
   margin-bottom: var(--space-32);
 }
 
+.dashboard-actions {
+  display: flex;
+  gap: var(--space-12);
+}
+
+.add-action-modal-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-20);
+  border-radius: var(--radius-lg);
+  font-weight: var(--font-weight-semibold);
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.add-action-modal-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.add-action-modal-btn .btn-icon {
+  font-size: var(--font-size-lg);
+}
+
+.add-action-modal-btn .btn-text {
+  font-size: var(--font-size-base);
+}
+
 /* Dashboard Grid Layout */
 .dashboard-bottom {
   display: grid;
@@ -1139,6 +1245,20 @@ select.form-control {
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: var(--space-24);
   justify-content: center;
+}
+
+/* Override for direct badge items in badges-grid (dashboard) */
+.badges-grid > .badge-item {
+  width: auto;
+  min-width: 120px;
+  max-width: 150px;
+}
+
+/* Simple grid for dashboard badges */
+.badges-grid.badges-simple {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-16);
+  max-width: none;
 }
 
 .badge-category {
@@ -4360,11 +4480,27 @@ html[data-color-scheme="dark"] *,
   background: linear-gradient(135deg, rgba(var(--success-rgb), 0.1), rgba(var(--success-rgb), 0.05));
   border-color: var(--color-success);
   color: var(--color-success);
+  position: relative;
+  overflow: hidden;
 }
 
 .action-button.completed::before {
   background: var(--color-success);
   opacity: 1;
+}
+
+.completed-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(var(--success-rgb), 0.9);
+  color: white;
+  font-size: var(--font-size-xs);
+  padding: var(--space-2);
+  text-align: center;
+  font-weight: var(--font-weight-medium);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .action-content {
@@ -4675,3 +4811,129 @@ html[data-color-scheme="dark"] *,
       justify-content: center;
     }
   }
+
+/* --- Add Action Modal --- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.modal-content {
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-2xl);
+  width: 90%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow: hidden;
+  transform: scale(0.9) translateY(20px);
+  transition: all 0.3s ease;
+  border: 1px solid var(--color-border);
+}
+
+.modal-overlay.active .modal-content {
+  transform: scale(1) translateY(0);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-24);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: var(--font-size-2xl);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+.modal-body {
+  padding: var(--space-24);
+  background: var(--color-surface);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-12);
+  padding: var(--space-24);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-background);
+}
+
+@media (max-width: 768px) {
+  .modal-content {
+    width: 95%;
+    margin: var(--space-16);
+    max-height: 85vh;
+  }
+  
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding: var(--space-20);
+  }
+  
+  .modal-footer {
+    flex-direction: column-reverse;
+    gap: var(--space-8);
+  }
+  
+  .modal-footer .btn {
+    width: 100%;
+  }
+  
+  .dashboard-actions {
+    flex-direction: column;
+    gap: var(--space-8);
+  }
+  
+  .add-action-modal-btn {
+    padding: var(--space-10) var(--space-16);
+  }
+  
+  .add-action-modal-btn .btn-text {
+    font-size: var(--font-size-sm);
+  }
+}

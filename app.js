@@ -89,13 +89,6 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_ANON_KEY,
   {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
-      flowType: 'pkce',
-      storage: localStorage
-    },
     db: {
       schema: 'public'
     },
@@ -103,11 +96,6 @@ const supabase = createClient(
       headers: { 
         'X-Client-Info': 'habitide-tracker@1.0.0',
         'Cache-Control': 'no-cache'
-      }
-    },
-    realtime: {
-      params: {
-        eventsPerSecond: 10
       }
     }
   }
@@ -812,38 +800,117 @@ class HabitideApp {
   async checkAuth() {
     console.log("HabitideApp: DEBUG - checkAuth() called");
     
-    const { data: { user }, error } = await supabase.auth.getUser();
-
-    if (error) {
-      console.error("HabitideApp: DEBUG - supabase.auth.getUser() error:", error);
-      this.user = null;
-      return; // Let init() handle showing auth UI
-    }
-
-    console.log("HabitideApp: DEBUG - supabase.auth.getUser() response - user:", user ? 'Object' : 'null', "error:", error);
+    // Check localStorage for user session
+    const savedUser = localStorage.getItem('habitide-user');
     
-    if (user) {
-      this.user = user;
+    if (savedUser) {
+      try {
+        this.user = JSON.parse(savedUser);
+        console.log("HabitideApp: DEBUG - User found in localStorage:", this.user);
+        
+        // Verify user still exists in database
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('id, username')
+          .eq('id', this.user.id)
+          .single();
+        
+        if (error || !userData) {
+          console.log("HabitideApp: DEBUG - User not found in database, attempting recovery...");
+          
+          // Try to recover the user by creating the missing record
+          const recoveryResult = await this.recoverMissingUser(this.user);
+          if (recoveryResult) {
+            console.log("HabitideApp: DEBUG - User recovered successfully");
+          } else {
+            console.log("HabitideApp: DEBUG - User recovery failed, clearing session");
+            this.user = null;
+            localStorage.removeItem('habitide-user');
+          }
+        } else {
+          this.user = userData;
+          console.log("HabitideApp: DEBUG - User verified in database");
+        }
+      } catch (error) {
+        console.error("HabitideApp: DEBUG - Error parsing saved user:", error);
+        this.user = null;
+        localStorage.removeItem('habitide-user');
+      }
     } else {
       this.user = null;
+      console.log("HabitideApp: DEBUG - No user found in localStorage");
     }
     
     console.log("HabitideApp: DEBUG - checkAuth() completed. this.user set to:", this.user ? 'Object' : 'null');
+  }
+
+  // New method to recover missing user records
+  async recoverMissingUser(userData) {
+    try {
+      console.log("HabitideApp: DEBUG - Attempting to recover user:", userData.id);
+      
+      // Create the missing user record
+      const { data: newUser, error: createError } = await supabase
+        .from('users')
+        .insert({
+          id: userData.id,
+          username: userData.username || 'recovered_user',
+          password_hash: 'needs_reset', // User will need to reset password
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+      
+      if (createError) {
+        console.error("HabitideApp: DEBUG - Failed to recover user:", createError);
+        return false;
+      }
+      
+      // Also ensure they have a profile
+      await this.ensureUserProfile();
+      
+      this.user = { id: newUser.id, username: newUser.username };
+      this.showNotification('Account recovered successfully. You may need to reset your password.', 'info');
+      return true;
+      
+    } catch (error) {
+      console.error("HabitideApp: DEBUG - User recovery error:", error);
+      return false;
+    }
+  }
+
+  // Ensure user has a profile record
+  async ensureUserProfile() {
+    if (!this.user) return;
     
-    // Set up the session listener only once
-    if (!this.authStateChangeListenerAttached) {
-        supabase.auth.onAuthStateChange((event, session) => {
-            console.log("HabitideApp: DEBUG - onAuthStateChange event:", event, "session:", session);
-            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-                this.user = session.user;
-                // Reload the app when user signs in
-                this.init();
-            } else if (event === 'SIGNED_OUT') {
-                this.user = null;
-                this.showAuthUI();
-            }
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', this.user.id)
+        .single();
+        
+      if (error && error.code === 'PGRST116') { // No rows found
+        console.log("HabitideApp: DEBUG - Creating missing profile for user:", this.user.id);
+        
+        await supabase.from('profiles').insert({
+          id: this.user.id,
+          data: {
+            settings: {
+              targetGoal: 20000,
+              reminderTime: '20:00',
+              theme: 'light',
+              quickActions: [1, 2, 3, 4]
+            },
+            customWorkouts: {},
+            workoutState: {}
+          }
         });
-        this.authStateChangeListenerAttached = true;
+        
+        console.log("HabitideApp: DEBUG - Profile created successfully");
+      }
+    } catch (error) {
+      console.error("HabitideApp: DEBUG - Error ensuring user profile:", error);
     }
   }
 
@@ -885,6 +952,32 @@ class HabitideApp {
       const minMonth = String(minDate.getMonth() + 1).padStart(2, '0');
       const minDay = String(minDate.getDate()).padStart(2, '0');
       dateInput.min = `${minYear}-${minMonth}-${minDay}`;
+    }
+  }
+
+  setTodayDateForModal() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const modalDateInput = document.getElementById('modalActionDate');
+    if (modalDateInput && !modalDateInput.value) {
+      modalDateInput.value = `${year}-${month}-${day}`;
+      // Set max date to today + 7 days (prevent far future dates)
+      const maxDate = new Date(today);
+      maxDate.setDate(maxDate.getDate() + 7);
+      const maxYear = maxDate.getFullYear();
+      const maxMonth = String(maxDate.getMonth() + 1).padStart(2, '0');
+      const maxDay = String(maxDate.getDate()).padStart(2, '0');
+      modalDateInput.max = `${maxYear}-${maxMonth}-${maxDay}`;
+      
+      // Set min date to 1 year ago (prevent too old dates)
+      const minDate = new Date(today);
+      minDate.setFullYear(minDate.getFullYear() - 1);
+      const minYear = minDate.getFullYear();
+      const minMonth = String(minDate.getMonth() + 1).padStart(2, '0');
+      const minDay = String(minDate.getDate()).padStart(2, '0');
+      modalDateInput.min = `${minYear}-${minMonth}-${minDay}`;
     }
   }
 
@@ -1228,6 +1321,258 @@ class HabitideApp {
         }
       });
     }
+
+    // Add Action Modal Event Listeners
+    this.attachModalEventListeners();
+  }
+
+  attachModalEventListeners() {
+    // Open modal button
+    const openModalBtn = document.getElementById('openAddActionModal');
+    if (openModalBtn && !openModalBtn.dataset.listenerAttached) {
+      openModalBtn.addEventListener('click', () => this.openAddActionModal());
+      openModalBtn.dataset.listenerAttached = 'true';
+    }
+
+    // Close modal button
+    const closeModalBtn = document.getElementById('closeAddActionModal');
+    if (closeModalBtn && !closeModalBtn.dataset.listenerAttached) {
+      closeModalBtn.addEventListener('click', () => this.closeAddActionModal());
+      closeModalBtn.dataset.listenerAttached = 'true';
+    }
+
+    // Modal overlay click to close
+    const modalOverlay = document.getElementById('addActionModal');
+    if (modalOverlay && !modalOverlay.dataset.listenerAttached) {
+      modalOverlay.addEventListener('click', (e) => {
+        if (e.target === modalOverlay) {
+          this.closeAddActionModal();
+        }
+      });
+      modalOverlay.dataset.listenerAttached = 'true';
+    }
+
+    // Modal Add Action button
+    const modalAddActionBtn = document.getElementById('modalAddActionBtn');
+    if (modalAddActionBtn && !modalAddActionBtn.dataset.listenerAttached) {
+      modalAddActionBtn.addEventListener('click', () => {
+        const typeIdElement = document.getElementById('modalActionType');
+        const notesElement = document.getElementById('modalActionNotes');
+        const dateElement = document.getElementById('modalActionDate');
+        
+        const typeId = typeIdElement?.value;
+        const notes = notesElement?.value?.trim() || '';
+        const date = dateElement?.value;
+        
+        if (!date) {
+          this.showNotification('Please select a date', 'error');
+          dateElement?.focus();
+          return;
+        }
+        
+        if (!typeId) {
+          this.showNotification('Please select an action type', 'error');
+          typeIdElement?.focus();
+          return;
+        }
+
+        // Check if this action already exists for the selected date
+        const selectedDateStr = getDateString(new Date(date));
+        const actionsForDate = (this.data.actions || []).filter(action => 
+          getDateString(new Date(action.date)) === selectedDateStr
+        );
+        
+        const isDuplicate = actionsForDate.some(action => action.action_type_id === parseInt(typeId));
+        
+        if (isDuplicate) {
+          this.showNotification('This action has already been completed for the selected date', 'warning');
+          return;
+        }
+        
+        this.addAction(parseInt(typeId), 0, notes, date, false); // Modal form action
+        this.closeAddActionModal();
+      });
+      modalAddActionBtn.dataset.listenerAttached = 'true';
+    }
+
+    // Modal Clear button
+    const modalClearBtn = document.getElementById('modalClearBtn');
+    if (modalClearBtn && !modalClearBtn.dataset.listenerAttached) {
+      modalClearBtn.addEventListener('click', () => this.clearModalForm());
+      modalClearBtn.dataset.listenerAttached = 'true';
+    }
+
+    // Modal action type selection hint
+    const modalActionTypeSelect = document.getElementById('modalActionType');
+    if (modalActionTypeSelect && !modalActionTypeSelect.dataset.listenerAttached) {
+      modalActionTypeSelect.addEventListener('change', (e) => {
+        const typeId = parseInt(e.target.value);
+        // You can add hint logic here if needed
+      });
+      modalActionTypeSelect.dataset.listenerAttached = 'true';
+    }
+
+    // Modal date change listener to update available actions
+    const modalDateInput = document.getElementById('modalActionDate');
+    if (modalDateInput && !modalDateInput.dataset.listenerAttached) {
+      modalDateInput.addEventListener('change', (e) => {
+        const selectedDate = e.target.value;
+        console.log('Modal date changed to:', selectedDate);
+        
+        // Re-populate action types for the new date
+        this.populateModalActionTypes(selectedDate);
+        
+        // Clear any selected action type since the list changed
+        const typeSelect = document.getElementById('modalActionType');
+        if (typeSelect) typeSelect.value = '';
+      });
+      modalDateInput.dataset.listenerAttached = 'true';
+    }
+
+    // Escape key to close modal
+    if (!document.body.dataset.modalEscapeAttached) {
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          const modal = document.getElementById('addActionModal');
+          if (modal && modal.classList.contains('active')) {
+            this.closeAddActionModal();
+          }
+        }
+      });
+      document.body.dataset.modalEscapeAttached = 'true';
+    }
+  }
+
+  openAddActionModal() {
+    const modal = document.getElementById('addActionModal');
+    if (modal) {
+      modal.classList.add('active');
+      document.body.style.overflow = 'hidden'; // Prevent background scrolling
+      
+      // Set today's date first
+      this.setTodayDateForModal();
+      
+      // Then populate action types for today's date
+      const todayStr = getDateString(new Date());
+      this.populateModalActionTypes(todayStr);
+      
+      // Focus on the first input
+      const firstInput = document.getElementById('modalActionDate');
+      if (firstInput) {
+        setTimeout(() => firstInput.focus(), 100);
+      }
+    }
+  }
+
+  closeAddActionModal() {
+    const modal = document.getElementById('addActionModal');
+    if (modal) {
+      modal.classList.remove('active');
+      document.body.style.overflow = ''; // Restore scrolling
+      this.clearModalForm();
+    }
+  }
+
+  clearModalForm() {
+    const typeElement = document.getElementById('modalActionType');
+    const notesElement = document.getElementById('modalActionNotes');
+    
+    if (typeElement) typeElement.value = '';
+    if (notesElement) notesElement.value = '';
+    
+    // Reset to today's date
+    this.setTodayDateForModal();
+    
+    // Refresh dropdown for today's date
+    const todayStr = getDateString(new Date());
+    this.populateModalActionTypes(todayStr);
+  }
+
+  populateModalActionTypes(selectedDate = null) {
+    const selectElement = document.getElementById('modalActionType');
+    if (!selectElement) return;
+
+    // Get the selected date from the date input if not provided
+    if (!selectedDate) {
+      const dateElement = document.getElementById('modalActionDate');
+      selectedDate = dateElement?.value;
+    }
+
+    // Clear existing options except the first one
+    selectElement.innerHTML = '<option value="">Choose an action...</option>';
+
+    const actionTypes = [
+      ...(this.data.actionTypes?.positive || []),
+      ...(this.data.actionTypes?.negative || [])
+    ];
+
+    if (!selectedDate || actionTypes.length === 0) {
+      // If no date selected or no action types, show empty state
+      if (!selectedDate) {
+        selectElement.innerHTML = '<option value="">First select a date...</option>';
+      }
+      return;
+    }
+
+    // Get actions for the selected date
+    const selectedDateStr = getDateString(new Date(selectedDate));
+    const actionsForDate = (this.data.actions || []).filter(action => 
+      getDateString(new Date(action.date)) === selectedDateStr
+    );
+    
+    const completedActionTypeIds = new Set(actionsForDate.map(action => action.action_type_id));
+
+    console.log('Modal dropdown debug:', {
+      selectedDate,
+      selectedDateStr,
+      actionsForDate: actionsForDate.length,
+      completedActionTypeIds: Array.from(completedActionTypeIds),
+      totalActionTypes: actionTypes.length
+    });
+
+    let availableCount = 0;
+    let completedCount = 0;
+
+    actionTypes.forEach(type => {
+      const isCompleted = completedActionTypeIds.has(type.id);
+      
+      if (isCompleted) {
+        // Add completed action as disabled option with visual indicator
+        const option = document.createElement('option');
+        option.value = type.id;
+        option.disabled = true;
+        option.textContent = `${type.name} (${type.value > 0 ? '+' : ''}${formatCurrency(type.value)}) ✓ Completed`;
+        option.style.color = '#999';
+        option.style.fontStyle = 'italic';
+        selectElement.appendChild(option);
+        completedCount++;
+      } else {
+        // Add available action as normal option
+        const option = document.createElement('option');
+        option.value = type.id;
+        option.textContent = `${type.name} (${type.value > 0 ? '+' : ''}${formatCurrency(type.value)})`;
+        selectElement.appendChild(option);
+        availableCount++;
+      }
+    });
+
+    // Add informational message at the bottom
+    if (completedCount > 0) {
+      const infoOption = document.createElement('option');
+      infoOption.disabled = true;
+      infoOption.textContent = `────────────────────────`;
+      infoOption.style.color = '#ccc';
+      selectElement.appendChild(infoOption);
+      
+      const summaryOption = document.createElement('option');
+      summaryOption.disabled = true;
+      summaryOption.textContent = `${availableCount} available, ${completedCount} completed`;
+      summaryOption.style.color = '#666';
+      summaryOption.style.fontSize = '0.9em';
+      selectElement.appendChild(summaryOption);
+    }
+
+    console.log(`Modal dropdown populated: ${availableCount} available, ${completedCount} completed`);
   }
 
   renderDashboard() {
@@ -1239,6 +1584,12 @@ class HabitideApp {
         <div class="dashboard-header">
           <div class="dashboard-title">
             <h1>Dashboard</h1>
+          </div>
+          <div class="dashboard-actions">
+            <button class="btn btn--primary add-action-modal-btn" id="openAddActionModal">
+              <span class="btn-icon">➕</span>
+              <span class="btn-text">Add Action</span>
+            </button>
           </div>
         </div>
 
@@ -1279,33 +1630,7 @@ class HabitideApp {
           </div>
         </div>
 
-        <!-- Add Actions -->
-        <div class="card add-actions-card">
-          <div class="card__body">
-            <h3>Add Actions</h3>
-            <p class="add-actions-subtitle">Add actions for any date</p>
-            <div class="add-actions-form">
-              <div class="form-group">
-                <label class="form-label" for="actionDate">Select Date</label>
-                <input type="date" class="form-control" id="actionDate">
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="addActionType">Action Type</label>
-                <select class="form-control" id="addActionType">
-                  <option value="">Choose an action...</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="actionNotes">Notes (Optional)</label>
-                <input type="text" class="form-control" id="actionNotes" placeholder="Add a note...">
-              </div>
-              <div class="form-actions">
-                <button class="btn btn--primary" id="addActionBtn">Add Action</button>
-                <button class="btn btn--secondary" id="clearFormBtn">Clear</button>
-              </div>
-            </div>
-          </div>
-        </div>
+
 
         <div class="dashboard-bottom">
           <!-- Quick Actions - Today -->
@@ -1334,22 +1659,54 @@ class HabitideApp {
         <div class="achievement-badges-section">
           <h2 class="badges-title">Achievement Badges</h2>
           <p class="badges-subtitle">Unlock badges by completing goals and building habits</p>
-                     <div class="badges-grid" id="badgesContainer">
-             <!-- Badges will be populated here -->
-           </div>
+          <div class="badges-grid badges-simple" id="badgesContainer">
+            <!-- Badges will be populated here -->
+          </div>
+        </div>
+      </div>
+      
+      <!-- Add Action Modal -->
+      <div class="modal-overlay" id="addActionModal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>Add Action</h3>
+            <button class="modal-close" id="closeAddActionModal">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-container">
+              <div class="form-group">
+                <label class="form-label" for="modalActionDate">Select Date</label>
+                <input type="date" class="form-control" id="modalActionDate">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="modalActionType">Action Type</label>
+                <select class="form-control" id="modalActionType">
+                  <option value="">Choose an action...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="modalActionNotes">Notes (Optional)</label>
+                <input type="text" class="form-control" id="modalActionNotes" placeholder="Add a note...">
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn--secondary" id="modalClearBtn">Clear</button>
+            <button class="btn btn--primary" id="modalAddActionBtn">Add Action</button>
+          </div>
         </div>
       </div>
     `;
 
-    // Set today's date in the date input
-    this.setTodayDate();
+    // Set today's date in the modal date input
+    this.setTodayDateForModal();
     
     // Populate dynamic content
     this.updateDashboardStats();
     this.populateActionTypeSelects();
     this.renderQuickActions();
     this.renderRecentActivities();
-    this.renderBadges();
+    this.renderBadges('badgesContainer'); // Explicitly target dashboard badges container
     
     // Attach event listeners after content is ready
     this.reAttachEventListeners();
@@ -1721,6 +2078,7 @@ class HabitideApp {
     // Make sure the selected date is properly displayed
     this.updateSelectedDateActions();
     this.populateActionTypeSelects();
+    this.populateCalendarActionTypes(); // Initialize calendar dropdown for selected date
   }
 
   renderCalendarGrid() {
@@ -1838,6 +2196,14 @@ class HabitideApp {
               </div>
               <button class="btn btn--primary" id="saveSettingsBtn">Save Settings</button>
               
+              <div class="user-zone" style="margin-top: var(--space-24); padding-top: var(--space-24); border-top: 1px solid var(--color-border);">
+                <h4 style="margin-bottom: var(--space-16);">Account</h4>
+                <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--space-16);">
+                  Signed in as: <strong>${this.user?.username}</strong>
+                </p>
+                <button class="btn btn--outline" onclick="app.signOut()" style="margin-bottom: var(--space-16);">Sign Out</button>
+              </div>
+              
               <div class="danger-zone" style="margin-top: var(--space-24); padding-top: var(--space-24); border-top: 1px solid var(--color-border);">
                 <h4 style="color: var(--color-error); margin-bottom: var(--space-16);">Danger Zone</h4>
                 <button class="btn btn--outline" id="resetDataBtn" style="border-color: var(--color-error); color: var(--color-error);">Reset All Data</button>
@@ -1938,7 +2304,7 @@ class HabitideApp {
     document.getElementById('addNegativeActionTypeBtn')?.addEventListener('click', () => this.addActionType('negative'));
     
     // Render badges in the badge progress section
-    this.renderBadges();
+    this.renderBadges('badgeProgressList'); // Explicitly target profile badges container
   }
 
   async saveQuickActions() {
@@ -2387,15 +2753,33 @@ class HabitideApp {
       return;
     }
 
-    // Use selected date, or today if no date is selected
-    const targetDate = this.selectedDate || new Date();
+    if (!this.selectedDate) {
+      this.showNotification('Please select a date first', 'error');
+      return;
+    }
+
+    // Use selected date
+    const targetDate = this.selectedDate;
     const dateString = getDateString(targetDate);
+    
+    // Check if this action already exists for the selected date
+    const actionsForDate = (this.data.actions || []).filter(action => 
+      getDateString(new Date(action.date)) === dateString
+    );
+    
+    const isDuplicate = actionsForDate.some(action => action.action_type_id === actionTypeId);
+    
+    if (isDuplicate) {
+      this.showNotification('This action has already been completed for the selected date', 'warning');
+      return;
+    }
     
     await this.addAction(actionTypeId, 0, '', dateString, false); // Manual action from calendar
     
     // Refresh calendar and selected date display
     this.renderCalendarGrid(); // Only re-render the grid, not the whole calendar
     this.updateSelectedDateActions();
+    this.populateCalendarActionTypes(); // Refresh dropdown to show updated state
     
     // Reset select
     select.value = '';
@@ -2722,11 +3106,11 @@ class HabitideApp {
     }
 
     try {
-      // Check if user already has action types
+      // Check if user already has action types OR if default types exist
       const { data: existing, error: checkError } = await supabase
         .from('action_types')
         .select('id')
-        .eq('user_id', this.user.id)
+        .or(`user_id.eq.${this.user.id},is_default.eq.true`)
         .limit(1);
 
       if (checkError) {
@@ -2735,29 +3119,30 @@ class HabitideApp {
       }
 
       if (existing && existing.length > 0) {
-        console.log('User already has action types, skipping seeding');
+        console.log('User already has action types or defaults exist, skipping seeding');
         return true;
       }
 
-      // Default actions to seed
+      // Default actions to seed - 16 total actions
       const defaultActions = [
-        // Positive
-        { name: 'Gym/Exercise', value: 1000, category: 'positive' },
-        { name: 'Healthy Meal', value: 500, category: 'positive' },
-        { name: 'Meditation', value: 300, category: 'positive' },
-        { name: 'Study/Learning', value: 750, category: 'positive' },
-        { name: 'Early Sleep', value: 250, category: 'positive' },
-        { name: 'No Social Media', value: 400, category: 'positive' },
-        { name: 'Water Goal Met', value: 200, category: 'positive' },
-        { name: 'Read Book', value: 600, category: 'positive' },
-        // Negative
-        { name: 'Fast Food', value: -500, category: 'negative' },
-        { name: 'Skipped Workout', value: -750, category: 'negative' },
-        { name: 'Late Night Scrolling', value: -400, category: 'negative' },
-        { name: 'Procrastination', value: -300, category: 'negative' },
-        { name: 'Junk Food', value: -350, category: 'negative' },
-        { name: 'Missed Deadline', value: -800, category: 'negative' },
-        { name: 'Excessive Shopping', value: -1000, category: 'negative' }
+        // Positive Actions (8 total)
+        { name: 'Workout/Exercise', value: 2000, category: 'positive' },
+        { name: 'Debt Payment', value: 5000, category: 'positive' },
+        { name: 'Healthy Meal', value: 1000, category: 'positive' },
+        { name: 'Meditation', value: 2000, category: 'positive' },
+        { name: 'Early Sleep', value: 2000, category: 'positive' },
+        { name: 'Learning', value: 2000, category: 'positive' },
+        { name: 'See sunrise', value: 5000, category: 'positive' },
+        { name: 'Reading', value: 2000, category: 'positive' },
+        // Negative Actions (8 total)
+        { name: 'Junk Food', value: -2000, category: 'negative' },
+        { name: 'Skipped Workout', value: -3000, category: 'negative' },
+        { name: 'Impulse Purchase', value: -3000, category: 'negative' },
+        { name: 'Porn', value: -5000, category: 'negative' },
+        { name: 'Procrastination', value: -5000, category: 'negative' },
+        { name: 'Miss sunrise', value: -10000, category: 'negative' },
+        { name: 'Overtrading', value: -10000, category: 'negative' },
+        { name: 'Bad financial decision', value: -10000, category: 'negative' }
       ];
 
       // Insert all for this user
@@ -2866,7 +3251,8 @@ class HabitideApp {
   }
 
   populateActionTypeSelects() {
-    const selects = document.querySelectorAll('#addActionType, #calendarActionType');
+    // Only populate generic selects (not calendar which needs date-aware filtering)
+    const selects = document.querySelectorAll('#addActionType');
     const actionTypesData = this.data.actionTypes || { positive: [], negative: [] };
     
     // Combine positive and negative action types into a single array
@@ -2895,12 +3281,97 @@ class HabitideApp {
     });
   }
 
+  // Separate method for calendar action type population with date filtering
+  populateCalendarActionTypes() {
+    const selectElement = document.getElementById('calendarActionType');
+    if (!selectElement) return;
+
+    // Clear existing options
+    selectElement.innerHTML = '<option value="">Add action for this date...</option>';
+
+    // Get selected date
+    if (!this.selectedDate) {
+      selectElement.innerHTML = '<option value="">Select a date first...</option>';
+      return;
+    }
+
+    const actionTypesData = this.data.actionTypes || { positive: [], negative: [] };
+    const actionTypes = [
+      ...(Array.isArray(actionTypesData.positive) ? actionTypesData.positive : []),
+      ...(Array.isArray(actionTypesData.negative) ? actionTypesData.negative : [])
+    ];
+
+    if (actionTypes.length === 0) {
+      selectElement.innerHTML = '<option value="">No action types available</option>';
+      return;
+    }
+
+    // Get actions for the selected date
+    const selectedDateStr = getDateString(this.selectedDate);
+    const actionsForDate = (this.data.actions || []).filter(action => 
+      getDateString(new Date(action.date)) === selectedDateStr
+    );
+    
+    const completedActionTypeIds = new Set(actionsForDate.map(action => action.action_type_id));
+
+    console.log('Calendar dropdown debug:', {
+      selectedDate: this.selectedDate.toDateString(),
+      selectedDateStr,
+      actionsForDate: actionsForDate.length,
+      completedActionTypeIds: Array.from(completedActionTypeIds),
+      totalActionTypes: actionTypes.length
+    });
+
+    let availableCount = 0;
+    let completedCount = 0;
+
+    actionTypes.forEach(type => {
+      const isCompleted = completedActionTypeIds.has(type.id);
+      
+      if (isCompleted) {
+        // Add completed action as disabled option with visual indicator
+        const option = document.createElement('option');
+        option.value = type.id;
+        option.disabled = true;
+        option.textContent = `${type.name} (${type.value > 0 ? '+' : ''}${formatCurrency(type.value)}) ✓ Completed`;
+        option.style.color = '#999';
+        option.style.fontStyle = 'italic';
+        selectElement.appendChild(option);
+        completedCount++;
+      } else {
+        // Add available action as normal option
+        const option = document.createElement('option');
+        option.value = type.id;
+        option.textContent = `${type.name} (${type.value > 0 ? '+' : ''}${formatCurrency(type.value)})`;
+        selectElement.appendChild(option);
+        availableCount++;
+      }
+    });
+
+    // Add informational message at the bottom
+    if (completedCount > 0) {
+      const infoOption = document.createElement('option');
+      infoOption.disabled = true;
+      infoOption.textContent = `────────────────────────`;
+      infoOption.style.color = '#ccc';
+      selectElement.appendChild(infoOption);
+      
+      const summaryOption = document.createElement('option');
+      summaryOption.disabled = true;
+      summaryOption.textContent = `${availableCount} available, ${completedCount} completed`;
+      summaryOption.style.color = '#666';
+      summaryOption.style.fontSize = '0.9em';
+      selectElement.appendChild(summaryOption);
+    }
+
+    console.log(`Calendar dropdown populated: ${availableCount} available, ${completedCount} completed`);
+  }
+
   renderQuickActions() {
     const container = document.getElementById('quickActionsContainer');
     if (!container) return;
     
-    // Prevent duplicate rendering
-    if (container.dataset.rendered === 'true') return;
+    console.log('renderQuickActions called - rendered flag:', container.dataset.rendered);
     
     const settings = this.data.settings || {};
     const selectedActionIds = settings.quickActions || [];
@@ -2939,30 +3410,56 @@ class HabitideApp {
       getDateString(new Date(action.date)) === todayStr
     );
     
+    console.log('Quick Actions Debug:', {
+      todayStr,
+      totalActions: this.data.actions?.length || 0,
+      todayActionsCount: todayActions.length,
+      todayActionTypes: todayActions.map(a => a.action_type_id),
+      selectedActionTypes: selectedActionTypes.map(t => ({ id: t.id, name: t.name }))
+    });
+    
     let html = '';
     
     selectedActionTypes.forEach(type => {
       const hasActionToday = todayActions.some(action => action.action_type_id === type.id);
-      const buttonClass = hasActionToday ? 'action-button completed' : 'action-button';
+      console.log(`Action type ${type.name} (ID: ${type.id}): ${hasActionToday ? 'COMPLETED' : 'AVAILABLE'} today`);
       
-      html += `
-        <button class="${buttonClass}" 
-                onclick="app.addQuickAction(${type.id})" 
-                ${hasActionToday ? 'disabled' : ''}
-                title="${hasActionToday ? 'Already completed today' : 'Click to mark as completed today'}">
-          <div class="action-name">${type.name}</div>
-          <div class="action-value ${type.value >= 0 ? 'positive' : 'negative'}">
-            ${type.value >= 0 ? '+' : ''}${formatCurrency(type.value)}
+      if (hasActionToday) {
+        // Completed action - no click handler, styled as completed
+        html += `
+          <div class="action-button completed" 
+               style="pointer-events: none; opacity: 0.7; cursor: not-allowed;"
+               title="Completed today ✓">
+            <div class="action-name">${type.name}</div>
+            <div class="action-value ${type.value >= 0 ? 'positive' : 'negative'}">
+              ${type.value >= 0 ? '+' : ''}${formatCurrency(type.value)}
+            </div>
+            <div class="action-button-icon">✓</div>
+            <div class="completed-overlay">Completed Today</div>
           </div>
-          <div class="action-button-icon">
-            ${hasActionToday ? '✓' : '+'}
-          </div>
-        </button>
-      `;
+        `;
+      } else {
+        // Active action - with click handler
+        html += `
+          <button class="action-button" 
+                  data-action-id="${type.id}"
+                  title="Click to mark as completed today">
+            <div class="action-name">${type.name}</div>
+            <div class="action-value ${type.value >= 0 ? 'positive' : 'negative'}">
+              ${type.value >= 0 ? '+' : ''}${formatCurrency(type.value)}
+            </div>
+            <div class="action-button-icon">+</div>
+          </button>
+        `;
+      }
     });
     
     container.innerHTML = html;
     container.dataset.rendered = 'true';
+    
+    // Add event delegation for quick action buttons
+    container.removeEventListener('click', this.handleQuickActionClick);
+    container.addEventListener('click', this.handleQuickActionClick.bind(this));
   }
 
   renderRecentActivities() {
@@ -3006,45 +3503,123 @@ class HabitideApp {
     container.innerHTML = html;
   }
 
-  renderBadges() {
-    const container = document.getElementById('badgeProgressList');
+  // Handle quick action button clicks with event delegation
+  handleQuickActionClick(event) {
+    const button = event.target.closest('.action-button[data-action-id]');
+    if (button && !button.classList.contains('completed')) {
+      const actionId = parseInt(button.dataset.actionId);
+      this.addQuickAction(actionId);
+    }
+  }
+
+  renderBadges(targetContainer = null) {
+    // Use specified container or try to find appropriate one based on current section
+    let container = null;
+    
+    if (targetContainer) {
+      container = document.getElementById(targetContainer);
+    } else {
+      // Determine context by checking current active section
+      const activeSection = document.querySelector('.section.active');
+      const currentSection = activeSection ? activeSection.id : 'dashboard';
+      
+      if (currentSection === 'profile') {
+        container = document.getElementById('badgeProgressList');
+      } else {
+        container = document.getElementById('badgesContainer');
+      }
+      
+      // Fallback to any available container
+      if (!container) {
+        container = document.getElementById('badgeProgressList') || 
+                   document.getElementById('badgesContainer') ||
+                   document.querySelector('.badges-grid');
+      }
+    }
+    
     if (!container) {
       console.log('Badge container not found');
       return;
     }
     
+    // Ensure badges are initialized
+    if (!this.data.badges || this.data.badges.length === 0) {
+      console.log('Initializing default badges...');
+      this.data.badges = [
+        // Milestone badges
+        { id: 1, name: "First Step", icon: "🎯", type: "milestone", requirement: 1, description: "Complete your first action", earned: false },
+        
+        // Streak badges
+        { id: 2, name: "Week Warrior", icon: "🔥", type: "streak", requirement: 7, description: "7-day streak", earned: false },
+        { id: 3, name: "Month Master", icon: "💎", type: "streak", requirement: 30, description: "30-day streak", earned: false },
+        { id: 4, name: "Hundred Hero", icon: "👑", type: "streak", requirement: 100, description: "100-day streak", earned: false },
+        
+        // Savings badges (debt reduction)
+        { id: 5, name: "Quarter Crusher", icon: "⭐", type: "savings", requirement: 0.25, description: "Reduce debt by 25%", earned: false },
+        { id: 6, name: "Half Hero", icon: "🌟", type: "savings", requirement: 0.5, description: "Reduce debt by 50%", earned: false },
+        { id: 7, name: "Debt Destroyer", icon: "💰", type: "savings", requirement: 1.0, description: "Eliminate all debt", earned: false },
+        
+        // Action count badges
+        { id: 8, name: "Action Hero", icon: "💪", type: "actions", requirement: 50, description: "Complete 50 positive actions", earned: false },
+        { id: 9, name: "Century Club", icon: "🏆", type: "actions", requirement: 100, description: "Complete 100 positive actions", earned: false }
+      ];
+    }
+    
     // Calculate badge progress dynamically
     this.calculateBadgeProgress();
     
-    if (!this.data.badges || this.data.badges.length === 0) {
-      container.innerHTML = '<div class="empty-state">No badges available</div>';
-      return;
-    }
+    console.log('Rendering badges:', this.data.badges.length, 'badges found');
 
     let html = '';
+    
+    // Check if we're rendering in profile section (detailed view) or dashboard (compact view)
+    const isProfileSection = container.id === 'badgeProgressList';
     
     this.data.badges.forEach(badge => {
       const progress = this.getBadgeProgress(badge);
       const percentage = Math.min((progress / badge.requirement) * 100, 100);
       const isEarned = badge.earned || progress >= badge.requirement;
       
-      html += `
-        <div class="badge-item ${isEarned ? 'earned' : ''}">
-          <div class="badge-icon">${badge.icon}</div>
-          <div class="badge-info">
-            <h4>${badge.name}</h4>
-            <p>${badge.description}</p>
-            <div class="badge-progress">${this.formatBadgeProgress(badge, progress)}</div>
+      if (isProfileSection) {
+        // Detailed view for profile section
+        html += `
+          <div class="badge-progress-item ${isEarned ? 'earned' : ''}">
+            <div class="badge-progress-info">
+              <div class="badge-progress-icon ${isEarned ? 'earned' : ''}">${badge.icon}</div>
+              <div class="badge-progress-details">
+                <div class="badge-progress-name">${badge.name}</div>
+                <div class="badge-progress-description">${badge.description}</div>
+              </div>
+            </div>
+            <div class="badge-progress-status">
+              <div class="badge-progress-text ${isEarned ? 'earned' : ''}">${this.formatBadgeProgress(badge, progress)}</div>
+              <div class="badge-progress-bar-container">
+                <div class="badge-progress-bar-fill" style="width: ${percentage}%"></div>
+              </div>
+            </div>
           </div>
-        </div>
-      `;
+        `;
+      } else {
+        // Compact view for dashboard - direct badge items for grid layout
+        html += `
+          <div class="badge-item ${isEarned ? 'earned' : ''}">
+            <div class="badge-circle ${isEarned ? 'earned' : (progress > 0 ? 'in-progress' : 'locked')}">
+              <div class="badge-icon">${badge.icon}</div>
+            </div>
+            <div class="badge-info">
+              <div class="badge-name">${badge.name}</div>
+              <div class="badge-progress-text">${this.formatBadgeProgress(badge, progress)}</div>
+            </div>
+          </div>
+        `;
+      }
     });
     
     if (html === '') {
       html = '<div class="empty-state">No badges available</div>';
     }
     container.innerHTML = html;
-    console.log('Badges rendered:', this.data.badges.length);
+    console.log('Badges rendered successfully:', this.data.badges.length, 'badges in', container.id || 'unknown container');
   }
 
   // Helper method to calculate badge progress
@@ -3175,6 +3750,7 @@ class HabitideApp {
     }
     this.renderCalendarGrid(); // Re-render to show selection
     this.updateSelectedDateActions(); // Update the selected date actions display
+    this.populateCalendarActionTypes(); // Update dropdown for the new selected date
   }
 
   updateSelectedDateActions() {
@@ -3240,13 +3816,7 @@ class HabitideApp {
   async addQuickAction(typeId) {
     const todayStr = getDateString(new Date());
     
-    // Prevent double clicks and race conditions
-    const button = event.target.closest('button');
-    if (button.disabled || button.dataset.processing === 'true') {
-      return;
-    }
-    
-    // Check if action already exists for today
+    // Check if action already exists for today FIRST
     const todayActions = (this.data.actions || []).filter(action => 
       getDateString(new Date(action.date)) === todayStr
     );
@@ -3254,30 +3824,52 @@ class HabitideApp {
     const hasActionToday = todayActions.some(action => action.action_type_id === typeId);
     
     if (hasActionToday) {
-      // Silently ignore if action already completed today
+      // Action already completed today - should not happen if UI is correct
+      console.log('Action already completed today for type:', typeId);
+      this.forceReRenderQuickActions(); // Force refresh UI to show correct state
       return;
     }
     
+    // Get the button element for visual feedback
+    const button = document.querySelector(`[data-action-id="${typeId}"]`);
+    if (button && (button.disabled || button.dataset.processing === 'true')) {
+      return; // Prevent double clicks
+    }
+    
     // Mark button as processing to prevent duplicate clicks
-    button.disabled = true;
-    button.dataset.processing = 'true';
-    button.style.opacity = '0.6';
-    button.innerHTML = button.innerHTML.replace('+', '⏳');
+    if (button) {
+      button.disabled = true;
+      button.dataset.processing = 'true';
+      button.style.opacity = '0.6';
+      const iconElement = button.querySelector('.action-button-icon');
+      if (iconElement) iconElement.textContent = '⏳';
+    }
     
     try {
       await this.addAction(typeId, 0, '', todayStr, true); // Pass true for isQuickAction
       
-      // Show success state briefly
-      button.innerHTML = button.innerHTML.replace('⏳', '✓');
-      button.classList.add('completed');
+      // Force immediate re-render to show the correct state
+      this.forceReRenderQuickActions();
       
     } catch (error) {
       // Reset button on error
-      button.innerHTML = button.innerHTML.replace('⏳', '+');
-      button.style.opacity = '1';
-      button.disabled = false;
-      button.dataset.processing = 'false';
+      if (button) {
+        button.style.opacity = '1';
+        button.disabled = false;
+        button.dataset.processing = 'false';
+        const iconElement = button.querySelector('.action-button-icon');
+        if (iconElement) iconElement.textContent = '+';
+      }
       console.error('Quick action failed:', error);
+    }
+  }
+
+  // Force re-render of quick actions by clearing the rendered flag
+  forceReRenderQuickActions() {
+    const container = document.getElementById('quickActionsContainer');
+    if (container) {
+      container.dataset.rendered = 'false';
+      this.renderQuickActions();
     }
   }
 
@@ -3294,109 +3886,208 @@ class HabitideApp {
       <div class="auth-container">
         <div class="auth-card">
           <h1>Welcome to Habitide Tracker</h1>
-          <p>Please sign in to continue</p>
-          <div class="auth-buttons">
-            <button class="btn btn--primary" onclick="app.signInWithGoogle()">Sign in with Google</button>
-            <button class="btn btn--secondary" onclick="app.signInWithEmail()">Sign in with Email</button>
+          <p>Please sign in or create an account to continue</p>
+          
+          <div class="auth-tabs">
+            <button class="auth-tab active" data-tab="signin">Sign In</button>
+            <button class="auth-tab" data-tab="signup">Sign Up</button>
+          </div>
+
+          <!-- Sign In Form -->
+          <div class="auth-form active" id="signin-form">
+            <div class="form-group">
+              <label class="form-label" for="signin-username">Username</label>
+              <input type="text" class="form-control" id="signin-username" placeholder="Enter your username" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="signin-password">Password</label>
+              <input type="password" class="form-control" id="signin-password" placeholder="Enter your password" required>
+            </div>
+            <button class="btn btn--primary btn--full-width" onclick="app.signIn()">Sign In</button>
+            <div class="auth-error" id="signin-error"></div>
+          </div>
+
+          <!-- Sign Up Form -->
+          <div class="auth-form" id="signup-form">
+            <div class="form-group">
+              <label class="form-label" for="signup-username">Username</label>
+              <input type="text" class="form-control" id="signup-username" placeholder="Choose a username" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="signup-password">Password</label>
+              <input type="password" class="form-control" id="signup-password" placeholder="Choose a password (min 6 characters)" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="signup-password-confirm">Confirm Password</label>
+              <input type="password" class="form-control" id="signup-password-confirm" placeholder="Confirm your password" required>
+            </div>
+            <button class="btn btn--primary btn--full-width" onclick="app.signUp()">Sign Up</button>
+            <div class="auth-error" id="signup-error"></div>
           </div>
         </div>
       </div>
     `;
     authSection.style.display = 'block';
-  }
-
-  async signInWithGoogle() {
-    try {
-      this.showLoadingOverlay();
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin
-        }
+    
+    // Add tab switching functionality
+    const authTabs = authSection.querySelectorAll('.auth-tab');
+    const authForms = authSection.querySelectorAll('.auth-form');
+    
+    authTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const targetTab = tab.dataset.tab;
+        
+        // Update active tab
+        authTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        
+        // Update active form
+        authForms.forEach(form => form.classList.remove('active'));
+        authSection.querySelector(`#${targetTab}-form`).classList.add('active');
       });
-      if (error) throw error;
-    } catch (error) {
-      console.error('Google sign-in error:', error);
-      this.hideLoadingOverlay();
-      
-      if (error.message?.includes('popup')) {
-        this.showConfirmationModal(
-          'Popup Blocked',
-          'Please allow popups for this site and try again, or use email sign-in instead.',
-          'warning'
-        );
-      } else if (error.message?.includes('Network')) {
-        this.showConfirmationModal(
-          'Connection Error',
-          'Unable to connect to Google. Please check your internet connection and try again.',
-          'error'
-        );
-      } else {
-        this.showConfirmationModal(
-          'Sign-in Failed',
-          'Failed to sign in with Google. Please try again or use email sign-in.',
-          'error'
-        );
-      }
-    }
+    });
   }
 
-  async signInWithEmail() {
-    const email = prompt('Enter your email address:');
-    if (!email) return;
-
-    // Validate email format
-    if (!isValidEmail(email)) {
-      this.showConfirmationModal(
-        'Invalid Email',
-        'Please enter a valid email address.',
-        'warning'
-      );
+  async signUp() {
+    const username = document.getElementById('signup-username').value.trim();
+    const password = document.getElementById('signup-password').value;
+    const passwordConfirm = document.getElementById('signup-password-confirm').value;
+    const errorElement = document.getElementById('signup-error');
+    
+    // Clear previous errors
+    errorElement.textContent = '';
+    
+    // Validation
+    if (!username || !password || !passwordConfirm) {
+      errorElement.textContent = 'Please fill in all fields';
       return;
     }
-
+    
+    if (username.length < 3) {
+      errorElement.textContent = 'Username must be at least 3 characters long';
+      return;
+    }
+    
+    if (password.length < CONFIG.MIN_PASSWORD_LENGTH) {
+      errorElement.textContent = `Password must be at least ${CONFIG.MIN_PASSWORD_LENGTH} characters long`;
+      return;
+    }
+    
+    if (password !== passwordConfirm) {
+      errorElement.textContent = 'Passwords do not match';
+      return;
+    }
+    
     try {
       this.showLoadingOverlay();
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email,
-        options: {
-          emailRedirectTo: window.location.origin
-        }
-      });
       
-      this.hideLoadingOverlay();
+      // Check if username already exists
+      const { data: existingUser, error: checkError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('username', username)
+        .single();
       
-      if (error) throw error;
-      
-      this.showConfirmationModal(
-        'Check Your Email!',
-        `We've sent a magic link to ${email}. Click the link in your email to sign in.`,
-        'success'
-      );
-    } catch (error) {
-      console.error('Email sign-in error:', error);
-      this.hideLoadingOverlay();
-      
-      if (error.message?.includes('rate limit')) {
-        this.showConfirmationModal(
-          'Too Many Attempts',
-          'Too many sign-in attempts. Please wait a few minutes before trying again.',
-          'warning'
-        );
-      } else if (error.message?.includes('Network')) {
-        this.showConfirmationModal(
-          'Connection Error',
-          'Unable to send email. Please check your internet connection and try again.',
-          'error'
-        );
-      } else {
-        this.showConfirmationModal(
-          'Email Failed',
-          'Failed to send login email. Please check your email address and try again.',
-          'error'
-        );
+      if (existingUser) {
+        errorElement.textContent = 'Username already exists. Please choose a different one.';
+        this.hideLoadingOverlay();
+        return;
       }
+      
+      // Create new user with basic hashing (in real app you'd use better hashing)
+      const hashedPassword = btoa(password); // Simple base64 encoding (not secure for production)
+      
+      // Generate UUID for user (to match database schema)
+      const userId = crypto.randomUUID();
+      
+      const { data: newUser, error: insertError } = await supabase
+        .from('users')
+        .insert({
+          id: userId,
+          username: username,
+          password_hash: hashedPassword,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+      
+      if (insertError) throw insertError;
+      
+      // Set user and initialize app
+      this.user = { id: newUser.id, username: newUser.username };
+      localStorage.setItem('habitide-user', JSON.stringify(this.user));
+      
+      // Create default action types for new user
+      await this.ensureUserHasDefaultActionTypes();
+      
+      this.hideLoadingOverlay();
+      this.showNotification('Account created successfully!', 'success');
+      await this.init();
+      
+    } catch (error) {
+      console.error('Sign-up error:', error);
+      this.hideLoadingOverlay();
+      errorElement.textContent = 'Failed to create account. Please try again.';
     }
+  }
+
+  async signIn() {
+    const username = document.getElementById('signin-username').value.trim();
+    const password = document.getElementById('signin-password').value;
+    const errorElement = document.getElementById('signin-error');
+    
+    // Clear previous errors
+    errorElement.textContent = '';
+    
+    if (!username || !password) {
+      errorElement.textContent = 'Please enter both username and password';
+      return;
+    }
+    
+    try {
+      this.showLoadingOverlay();
+      
+      // Find user by username
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', username)
+        .single();
+      
+      if (userError || !userData) {
+        errorElement.textContent = 'Invalid username or password';
+        this.hideLoadingOverlay();
+        return;
+      }
+      
+      // Verify password (simple base64 check - not secure for production)
+      const hashedPassword = btoa(password);
+      if (userData.password_hash !== hashedPassword) {
+        errorElement.textContent = 'Invalid username or password';
+        this.hideLoadingOverlay();
+        return;
+      }
+      
+      // Set user and initialize app
+      this.user = { id: userData.id, username: userData.username };
+      localStorage.setItem('habitide-user', JSON.stringify(this.user));
+      
+      this.hideLoadingOverlay();
+      this.showNotification('Signed in successfully!', 'success');
+      await this.init();
+      
+    } catch (error) {
+      console.error('Sign-in error:', error);
+      this.hideLoadingOverlay();
+      errorElement.textContent = 'Failed to sign in. Please try again.';
+    }
+  }
+
+  signOut() {
+    this.user = null;
+    localStorage.removeItem('habitide-user');
+    this.showAuthUI();
+    this.showNotification('Signed out successfully', 'info');
   }
 
   // Data management methods
@@ -3404,6 +4095,8 @@ class HabitideApp {
     if (!this.user) return;
     
     try {
+      console.log("HabitideApp: Loading data for user:", this.user.id);
+      
       // Load actions
       const { data: actions, error: actionsError } = await supabase
         .from('actions')
@@ -3411,7 +4104,10 @@ class HabitideApp {
         .eq('user_id', this.user.id)
         .order('date', { ascending: false });
 
-      if (actionsError) throw actionsError;
+      if (actionsError) {
+        console.error("HabitideApp: Actions query error:", actionsError);
+        throw actionsError;
+      }
 
       // Load settings from profiles table
       const { data: profile, error: profileError } = await supabase
@@ -3447,6 +4143,7 @@ class HabitideApp {
 
     } catch (error) {
       console.error('Failed to load data:', error);
+      
       // Use default data on error
       this.data.actions = [];
       this.data.settings = { 
@@ -3458,6 +4155,15 @@ class HabitideApp {
       this.data.customWorkouts = {};
       this.data.workoutState = {};
       this.data.lastFetched = Date.now(); // Even on error, update lastFetched to avoid infinite fetch loop
+      
+      // Show specific error information
+      if (error.message?.includes('406')) {
+        this.showNotification('Profile data access blocked - please check database setup', 'error');
+      } else if (error.message?.includes('relation') && error.message?.includes('does not exist')) {
+        this.showNotification('Database tables missing - please run setup script', 'error');
+      } else {
+        this.showNotification('Failed to load profile data - using defaults', 'warning');
+      }
     }
   }
 
@@ -3465,20 +4171,27 @@ class HabitideApp {
     if (!this.user) return;
 
     try {
+      console.log("HabitideApp: Loading action types for user:", this.user.id);
+      
       // Load both user's custom action types AND default action types
       const { data: actionTypes, error } = await supabase
         .from('action_types')
         .select('*')
-        .or(`user_id.eq.${this.user.id},is_default.eq.true`)
+        .or(`user_id.eq.${this.user.id},user_id.is.null`)
         .order('name');
 
-      if (error) throw error;
+      if (error) {
+        console.error("HabitideApp: Action types query error:", error);
+        throw error;
+      }
+
+      console.log("HabitideApp: Action types loaded:", actionTypes?.length || 0);
 
       // Remove duplicates by keeping user's version over default
       const uniqueActionTypes = [];
       const seen = new Set();
       
-      actionTypes.forEach(type => {
+      (actionTypes || []).forEach(type => {
         const key = `${type.name}_${type.category}`;
         if (!seen.has(key)) {
           seen.add(key);
@@ -3498,11 +4211,15 @@ class HabitideApp {
         negative: uniqueActionTypes.filter(type => type.category === 'negative')
       };
 
+      console.log("HabitideApp: Action types grouped - Positive:", this.data.actionTypes.positive.length, "Negative:", this.data.actionTypes.negative.length);
+
     } catch (error) {
       console.error('Failed to load action types:', error);
       // Use default empty arrays
       this.data.actionTypes = { positive: [], negative: [] };
       this.data.lastFetched = Date.now();
+      
+      this.showNotification('Failed to load action types', 'warning');
     }
   }
 
@@ -3887,19 +4604,45 @@ class HabitideApp {
   updateUIAfterAction(normalizedDate) {
     // Use requestAnimationFrame for smoother UI updates
     requestAnimationFrame(() => {
-      // Clear render flags to force fresh render
-      const quickActionsContainer = document.getElementById('quickActionsContainer');
-      if (quickActionsContainer) quickActionsContainer.dataset.rendered = 'false';
-      
-      // For today's actions, specifically refresh quick actions to show updated state
+      // For today's actions, force refresh quick actions to show updated state
       const actionDate = new Date(normalizedDate);
       const today = new Date();
       if (actionDate.toDateString() === today.toDateString()) {
-        this.renderQuickActions();
+        this.forceReRenderQuickActions();
       }
       
       this.renderRecentActivities();
       this.updateDashboardStats();
+      
+      // Re-render badges in correct context
+      const activeSection = document.querySelector('.section.active');
+      const currentSection = activeSection ? activeSection.id : 'dashboard';
+      if (currentSection === 'profile') {
+        this.renderBadges('badgeProgressList');
+      } else {
+        this.renderBadges('badgesContainer');
+      }
+
+      // If modal is open, refresh its dropdown to reflect the new action
+      const modal = document.getElementById('addActionModal');
+      if (modal && modal.classList.contains('active')) {
+        const dateInput = document.getElementById('modalActionDate');
+        if (dateInput && dateInput.value) {
+          this.populateModalActionTypes(dateInput.value);
+          // Clear selected action type since list changed
+          const typeSelect = document.getElementById('modalActionType');
+          if (typeSelect) typeSelect.value = '';
+        }
+      }
+
+      // If calendar page is active, refresh its dropdown too
+      const currentActiveSection = document.querySelector('.section.active');
+      if (currentActiveSection && currentActiveSection.id === 'calendar') {
+        this.populateCalendarActionTypes();
+        // Clear selected action type since list changed
+        const calendarTypeSelect = document.getElementById('calendarActionType');
+        if (calendarTypeSelect) calendarTypeSelect.value = '';
+      }
     });
   }
 
